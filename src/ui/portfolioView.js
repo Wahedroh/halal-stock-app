@@ -10,6 +10,24 @@ export function fmtSigned(x) {
   return `${x < 0 ? '-' : '+'}$${Math.abs(x).toFixed(2)}`;
 }
 
+/** เศษส่วน -> +6.5% / -3.3% / — (มีเครื่องหมายเสมอ) */
+export function fmtSignedPct(x) {
+  if (num(x) === null) return '—';
+  return `${x < 0 ? '-' : '+'}${Math.abs(x * 100).toFixed(1)}%`;
+}
+
+/** % การเปลี่ยนแปลงรายวัน (หน่วยเป็น % อยู่แล้ว เช่น -3.28) -> -3.28% / +1.20% / — */
+export function fmtChangePct(x) {
+  if (num(x) === null) return '—';
+  return `${x < 0 ? '-' : '+'}${Math.abs(x).toFixed(2)}%`;
+}
+
+/** คำนำหน้ายอดกำไร/ขาดทุน */
+export const pnlWord = (x) => (num(x) !== null && x < 0 ? 'ขาดทุน' : 'กำไร');
+
+/** บาทแบบปัดเต็ม: 40000 -> 40,000 */
+export const fmtThb = (x) => (num(x) === null ? '—' : Math.round(x).toLocaleString('en-US'));
+
 /**
  * ข้อมูลหน้าพอร์ต (ฟังก์ชันล้วน)
  * quotes: {SYM:{price,changePct}} · metrics: {SYM:{high52}} · plans: {SYM:planDoc}
