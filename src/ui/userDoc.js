@@ -10,5 +10,3 @@ function merge(base, over) {
 
 /** ผสมข้อมูลที่เก็บไว้ทับสำเนาของ DEFAULTS (คีย์ที่ขาดได้ค่าเริ่มต้น) */
 export const mergeUser = (stored) => merge(JSON.parse(JSON.stringify(DEFAULTS)), stored ?? {});
-
-export const cleanSymbol = (s) => String(s ?? '').trim().toUpperCase();

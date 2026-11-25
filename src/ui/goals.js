@@ -1,13 +1,13 @@
-import { h, infoButton, settle } from './components.js';
+import { h, infoButton, settle, field } from './components.js';
 import { buildGoalsView, parseGoalsForm, parseYieldPct, DEFAULT_YIELD_PCT } from './goalsView.js';
 import { buildPortfolioView } from './portfolioView.js';
 import { progressBar } from './portfolio.js';
 import { fmtPct, fmtUsd } from '../lib/metrics.js';
 import { listTxns, saveGoals } from '../lib/store.js';
+import { todayLocal } from '../lib/dates.js';
+import { errorText } from '../lib/errors.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
 const thb = (x) => `฿${Math.round(x).toLocaleString('en-US')}`;
-const field = (label, input) => h('label', { class: 'field' }, h('span', {}, label), input);
 
 export async function renderGoals(root, ctx) {
   const token = (root._tok = (root._tok ?? 0) + 1);
@@ -24,7 +24,6 @@ export async function renderGoals(root, ctx) {
   const quotes = Object.fromEntries(held.map((s, i) => [s, qs[i]]).filter(([, q]) => q.ok && q.v).map(([s, q]) => [s, q.v]));
   const quoteFailed = qs.some((q) => !q.ok);
   const pv = buildPortfolioView({ txns, quotes, settings: ctx.user.settings });
-  if (pv.error) { root.replaceChildren(h('h1', {}, 'เป้าหมาย'), h('p', { class: 'msg err' }, pv.error)); return; }
 
   const g = ctx.user.goals;
   const msg = h('p', { class: 'msg' });
@@ -34,7 +33,7 @@ export async function renderGoals(root, ctx) {
   const progress = h('div', {});
 
   const show = () => {
-    const v = buildGoalsView({ goals: ctx.user.goals, settings: ctx.user.settings, txns, summary: pv.summary, today: today(), yieldPct: parseYieldPct(yieldIn.value) });
+    const v = buildGoalsView({ goals: ctx.user.goals, settings: ctx.user.settings, txns, summary: pv.summary, today: todayLocal(), yieldPct: parseYieldPct(yieldIn.value) });
     progress.replaceChildren(
       h('h2', {}, 'เป้าปันผล', infoButton('dividendGoal')),
       h('p', { class: 'sub' }, `${thb(v.dividend.currentMonthlyThb)} / ${thb(v.dividend.targetThb)} ต่อเดือน (${fmtPct(v.dividend.pct)}) · ภายในอายุ ${v.dividend.byAge}`),
@@ -45,7 +44,7 @@ export async function renderGoals(root, ctx) {
       h('h2', {}, 'ผลตอบแทน', infoButton('returnGoal')),
       v.returns.target === null ? h('p', { class: 'sub' }, `ตอนนี้ ${fmtPct(v.returns.current)} · ยังไม่ได้ตั้งเป้า`)
         : h('div', {}, h('p', { class: 'sub' }, `${fmtPct(v.returns.current)} / ${fmtPct(v.returns.target)}`), progressBar(v.returns.pct)),
-      quoteFailed || pv.summary.missingPrices.length ? h('p', { class: 'msg warn' }, 'ดึงราคาบางตัวไม่ได้ ผลตอบแทนจึงใช้ต้นทุนแทนราคาตลาดของตัวนั้น') : null);
+      ...(quoteFailed || pv.summary.missingPrices.length ? [h('p', { class: 'msg warn' }, 'ดึงราคาบางตัวไม่ได้ ผลตอบแทนจึงใช้ต้นทุนแทนราคาตลาดของตัวนั้น')] : []));
     calc.replaceChildren(v.required === null
       ? h('p', { class: 'msg err' }, 'กรอกอัตราปันผลเฉลี่ยเป็นตัวเลขมากกว่า 0 ถึง 100')
       : h('div', {}, h('div', { class: 'kv' }, h('span', {}, 'ปันผลก่อนภาษีที่ต้องได้ต่อปี'), h('b', {}, fmtUsd(v.required.grossYearUsd))),
@@ -65,11 +64,12 @@ export async function renderGoals(root, ctx) {
     e.preventDefault();
     const res = parseGoalsForm(Object.fromEntries(Object.entries(f).map(([k, i]) => [k, i.value])));
     if (res.error) return say(res.error, false);
-    try { await saveGoals(ctx.uid, res.patch); Object.assign(ctx.user.goals, res.patch); say('บันทึกแล้ว', true); show(); } catch (err) { say(err.message || 'บันทึกไม่สำเร็จ', false); }
+    try { await saveGoals(ctx.uid, res.patch); Object.assign(ctx.user.goals, res.patch); say('บันทึกแล้ว', true); show(); } catch (err) { say(errorText(err), false); }
   }
   show();
   if (stale()) return;
   root.replaceChildren(h('h1', {}, 'เป้าหมาย'),
+    ...(pv.error ? [h('p', { class: 'msg err' }, pv.error)] : []),
     h('div', { class: 'card' }, progress),
     h('div', { class: 'card' }, h('h2', {}, 'เครื่องคำนวณเงินต้น', infoButton('requiredCapital')),
       field('อัตราปันผลเฉลี่ยของพอร์ต (%)', yieldIn), calc),
