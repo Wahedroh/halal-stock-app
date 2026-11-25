@@ -54,8 +54,9 @@ export async function renderPortfolio(root, ctx) {
 
   // ---- หัวกรมท่า: มูลค่ารวม + กำไร/ขาดทุนรวม ----
   const header = pageHeader({
-    sticker: 'พอร์ตของฉัน', title: fmtUsd(summary.marketValue),
-    hand: `มูลค่ารวม · ${pnlWord(summary.totalPnl)} ${fmtSigned(summary.totalPnl)} · ${fmtSignedPct(summary.returnPct)}`,
+    sticker: 'พอร์ตของฉัน', title: [h('span', { class: 'sr-only' }, 'มูลค่ารวม '), fmtUsd(summary.marketValue)],
+    hand: typeof summary.totalPnl !== 'number' || !Number.isFinite(summary.totalPnl) ? '—'
+      : `${pnlWord(summary.totalPnl)} ${fmtSigned(summary.totalPnl)} · ${fmtSignedPct(summary.returnPct)}`,
   });
   const notices = [
     view.error ? h('p', { class: 'msg err' }, view.error) : null,

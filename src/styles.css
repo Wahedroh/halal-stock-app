@@ -5,7 +5,7 @@
   --ok: #19693f; --ok-bg: #e0f1e7; --err: #b3261e; --err-bg: #fbe4e1; --warn: #8a5a00; --warn-bg: #fff3cf;
   --on-navy: #cfe0f5; --nav-ink: #b9c9de;
   --shadow: 4px 4px 0 var(--navy-d); --shadow-s: 3px 3px 0 var(--navy-d);
-  --radius: 16px; --focus: 0 0 0 3px var(--paper), 0 0 0 6px var(--navy);
+  --radius: 16px;
   --f-head: 'Kanit', 'Noto Sans Thai', 'Leelawadee UI', system-ui, sans-serif;
   --f-body: 'Sarabun', 'Noto Sans Thai', 'Leelawadee UI', system-ui, sans-serif;
   --f-hand: 'Itim', 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
@@ -19,7 +19,6 @@ h1, h2, h3 { font-family: var(--f-head); font-weight: 600; color: var(--navy-d);
 h2 { font-size: 1.05rem; margin: .9rem 0 .35rem; }
 h3 { font-size: 1.15rem; margin: .4rem 0; }
 a { color: var(--navy); }
-:focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* ---- โครงหน้า ---- */
 .view { max-width: 640px; margin: 0 auto; padding: 0 0 calc(104px + env(safe-area-inset-bottom)); min-height: 100vh; }
@@ -70,12 +69,13 @@ button.on-navy { background: transparent; color: #fff; border-color: var(--on-na
 
 /* ---- ช่องกรอก ---- */
 .field { display: block; margin: 12px 0; }
+.field-in { display: block; }
 .field-label { display: block; font: 500 .95rem/1.4 var(--f-head); color: var(--navy-d); margin-bottom: 4px; }
 input, select, textarea { width: 100%; min-height: 48px; padding: 10px 12px; border: 2px solid var(--navy-d); border-radius: 12px; background: #fff; color: var(--ink); font: 16px/1.4 var(--f-body); margin: 0; }
 textarea { min-height: 110px; resize: vertical; }
-input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 3px var(--yellow); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--navy-d); box-shadow: 0 0 0 3px var(--yellow), 0 0 0 5px var(--navy-d); }
 input:disabled { background: var(--line); }
-input::placeholder, textarea::placeholder { color: #737c8c; }
+input::placeholder, textarea::placeholder { color: #667085; }
 .input-wrap { display: flex; align-items: stretch; }
 .input-wrap input { border-radius: 12px 0 0 12px; border-right: 0; min-width: 0; flex: 1; }
 .input-wrap .suffix { display: flex; align-items: center; padding: 0 12px; border: 2px solid var(--navy-d); border-radius: 0 12px 12px 0; background: var(--yellow-l); color: var(--navy-d); font: 600 .85rem var(--f-head); white-space: nowrap; }
@@ -94,7 +94,8 @@ input::placeholder, textarea::placeholder { color: #737c8c; }
 .seg-opt span { display: flex; align-items: center; justify-content: center; min-height: 48px; font: 600 1rem var(--f-head); color: var(--navy); }
 .seg-opt input:checked + span { background: var(--navy); color: #fff; }
 .seg-opt input:checked + span::before { content: "✓ " / ""; margin-right: 4px; color: var(--yellow); }
-.seg-opt input:focus-visible + span { box-shadow: inset 0 0 0 3px var(--yellow); }
+.seg-opt input:focus-visible { outline: none; box-shadow: none; }
+.seg-opt input:focus-visible + span { box-shadow: inset 0 0 0 3px var(--yellow), inset 0 0 0 6px var(--navy-d); }
 
 /* ---- ข้อความ ---- */
 .msg { margin: 8px 0; font-size: .92rem; }
@@ -205,7 +206,6 @@ details.add-txn[open] > summary { background: var(--navy); color: #fff; }
 .nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; border-radius: 14px; color: var(--nav-ink); font: 500 .75rem/1.2 var(--f-head); text-decoration: none; }
 .nav a.active { background: var(--yellow); color: var(--navy-d); box-shadow: inset 0 0 0 2px var(--navy-d); }
 .nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.nav a:focus-visible { box-shadow: 0 0 0 3px var(--yellow); }
 
 /* ---- กล่องคำอธิบาย ---- */
 .modal { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(19, 40, 66, .55); }
@@ -215,6 +215,17 @@ details.add-txn[open] > summary { background: var(--navy); color: #fff; }
 /* ---- หน้าเข้าสู่ระบบ ---- */
 .gate .top { padding-top: calc(48px + env(safe-area-inset-top)); padding-bottom: 44px; }
 .gate .top h1 { font-size: 2rem; }
+
+/* ---- วงโฟกัสคีย์บอร์ด (อยู่ท้ายสุดเพื่อไม่ให้เงา/box-shadow ของปุ่มทับ) ---- */
+a:focus-visible, button:focus-visible, .btn:focus-visible, summary:focus-visible, .info-btn:focus-visible, .wchip-x:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--navy-d); outline-offset: 3px;
+}
+.top a:focus-visible, .top button:focus-visible, .top .info-btn:focus-visible, .nav a:focus-visible, .tranche-tile .info-btn:focus-visible {
+  outline-color: var(--yellow);
+}
+.tranche-tile .info-btn:focus-visible { outline-color: var(--navy-d); }
+.wchip-x:focus-visible { outline-offset: -4px; }
+.wchip:focus-within { box-shadow: 0 0 0 2px var(--yellow); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }

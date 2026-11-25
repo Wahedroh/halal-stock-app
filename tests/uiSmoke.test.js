@@ -49,7 +49,7 @@ test('stock page renders and per-form messages work', async () => {
   const radios = find(root, (n) => n.tag === 'input' && n.attrs.type === 'radio');
   expect(radios.map((r) => r.attrs.value)).toEqual(['buy', 'sell', 'dividend']);
   const pick = (v) => radios.find((r) => r.attrs.value === v).listeners.change[0]();
-  const priceField = find(root, (n) => n.tag === 'label' && n.textContent.startsWith('ราคาต่อหุ้นUSD'))[0];
+  const priceField = find(root, (n) => n.tag === 'label' && n.textContent.startsWith('ราคาต่อหุ้น (USD)'))[0];
   const price = find(priceField, (n) => n.tag === 'input')[0];
   shares.value = '1.5'; price.value = '10';
   pick('dividend');
@@ -63,6 +63,10 @@ test('portfolio renders with broken symbol named', async () => {
   expect(root.textContent).toContain('MSFT ขายเกินจำนวนที่ถือ');
   expect(root.textContent).toContain('AVGO');
   expect(root.textContent).not.toContain('null');
+});
+test('alert badge spaces the level label', async () => {
+  const { alertBadge } = await import('../src/ui/components.js');
+  expect(alertBadge({ label: 'TP', distance: 0.02 }).textContent).toBe('ใกล้ TP 2.0%');
 });
 test('invalid route symbol', async () => {
   const root = new Node('main');

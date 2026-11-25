@@ -1,4 +1,4 @@
-import { h, infoButton, alertBadge, halalBadge, settle, field, msgLine, segmented, pageHeader, cardTitle } from './components.js';
+import { h, infoButton, alertBadge, halalBadge, settle, field, msgLine, segmented, pageHeader, cardTitle, unitBox, helpText } from './components.js';
 import { fmtChangePct } from './portfolioView.js';
 import {
   buildStockView, applyPlanSave, shouldSavePeak, peakPatch, errorMessage, SUGGEST_NOTE,
@@ -13,7 +13,7 @@ import { errorText } from '../lib/errors.js';
 const row = (label, value, term) => h('div', { class: 'kv' }, h('span', {}, label, term ? infoButton(term) : null), h('b', {}, value));
 const stat = (label, value, term) => h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label, term ? infoButton(term) : null), h('b', {}, value));
 const TXN_LABEL = { buy: 'ซื้อ', sell: 'ขาย', dividend: 'ปันผล' };
-const usdBox = (input, unit = 'USD') => h('span', { class: 'input-wrap' }, input, h('span', { class: 'suffix' }, unit));
+const usdName = () => h('span', { class: 'sr-only' }, ' (USD)');
 
 export async function renderStock(root, ctx, rawSym, symError) {
   if (symError) {
@@ -122,8 +122,9 @@ export async function renderStock(root, ctx, rawSym, symError) {
   const tr = view.trailing;
   const trailText = !view.position.held ? 'ยังไม่ได้ถือ' : tr.active ? `เปิด · ขายเมื่อ ≤ ${fmtUsd(tr.stopPrice)}${tr.hit ? ' · ถึงจุดแล้ว' : ''}` : 'ยังไม่เปิด';
   const planForm = h('form', { class: 'plan-form', onsubmit: savePlanForm },
-    h('div', { class: 'row3' }, view.tranches.map((t, i) => h('label', { class: 'field' }, trSpans[i], usdBox(trInputs[i])))),
-    h('label', { class: 'field' }, tpSpan, usdBox(tpInput), h('small', { class: 'help' }, `${SUGGEST_NOTE} (52W High) · เว้นว่างเพื่อใช้สูตร`)),
+    h('div', { class: 'row3' }, view.tranches.map((t, i) => h('label', { class: 'field' }, trSpans[i], usdName(), unitBox(trInputs[i], 'USD')))),
+    h('div', { class: 'field' }, h('label', { class: 'field-in' }, tpSpan, usdName(), unitBox(tpInput, 'USD')),
+      helpText(tpInput, `${SUGGEST_NOTE} (52W High) · เว้นว่างเพื่อใช้สูตร`)),
     h('button', { type: 'submit', class: 'btn block' }, 'บันทึกแผน'), planMsg.el);
   const planCard = h('section', { class: 'card' },
     cardTitle('แผนซื้อ 3 ไม้', infoButton('tranches')),
@@ -225,13 +226,15 @@ export async function renderStock(root, ctx, rawSym, symError) {
   const noteMsg = msgLine();
   const note = h('textarea', { rows: '4', placeholder: 'ความเห็นของครู' }, view.note);
   const noteShow = h('p', { class: view.note ? 'note-text' : 'sub' }, view.note || 'ยังไม่มีความเห็น');
+  const noteSummary = h('summary', {}, view.note ? 'แก้ความเห็น' : 'เขียนความเห็น');
   const noteCard = h('section', { class: 'card' }, cardTitle('บันทึกความเห็น'), noteShow,
-    h('details', { class: 'more' }, h('summary', {}, view.note ? 'แก้ความเห็น' : 'เขียนความเห็น'),
+    h('details', { class: 'more' }, noteSummary,
       field('ความเห็นของครู', note),
       h('button', { type: 'button', class: 'btn block', onclick: async () => {
         try {
           await persistPlan({ note: note.value, ...peakPatch(view) });
           noteShow.className = note.value ? 'note-text' : 'sub'; noteShow.textContent = note.value || 'ยังไม่มีความเห็น';
+          noteSummary.textContent = note.value ? 'แก้ความเห็น' : 'เขียนความเห็น';
           noteMsg.say('บันทึกแล้ว', true);
         } catch (err) { noteMsg.say(errorText(err), false); }
       } }, 'บันทึกความเห็น'), noteMsg.el));

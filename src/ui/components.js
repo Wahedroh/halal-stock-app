@@ -51,7 +51,7 @@ export function infoButton(termId) {
   }, 'i');
 }
 
-export const alertBadge = (a) => h('span', { class: 'badge alert' }, `ใกล้${a.label} ${(a.distance * 100).toFixed(1)}%`);
+export const alertBadge = (a) => h('span', { class: 'badge alert' }, `ใกล้ ${a.label} ${(a.distance * 100).toFixed(1)}%`);
 
 export const HALAL_LABELS = { pass: 'ผ่านเกณฑ์ AAOIFI', fail: 'ไม่ผ่าน', unchecked: 'ยังไม่ได้ตรวจ' };
 export const halalBadge = (status) => h('span', { class: `badge halal-${HALAL_LABELS[status] ? status : 'unchecked'}` }, HALAL_LABELS[status] ?? HALAL_LABELS.unchecked);
@@ -61,15 +61,25 @@ const nextId = (p) => `${p}-${++uid}`;
 
 /**
  * ช่องกรอกพร้อมป้ายชื่อ
- * opts.suffix = หน่วยท้ายช่อง (เช่น USD) · opts.help = คำอธิบายใต้ช่อง (ผูกด้วย aria-describedby)
+ * opts.suffix = หน่วยท้ายช่อง (เช่น USD: แสดงด้วยตา ส่วนโปรแกรมอ่านหน้าจออ่านจากป้ายชื่อ)
+ * opts.help = คำอธิบายใต้ช่อง (อยู่นอก <label> ผูกด้วย aria-describedby จึงไม่ถูกอ่านซ้ำ)
  */
 export function field(label, input, opts = {}) {
   const { suffix, help } = opts;
-  const helpId = help ? nextId('help') : null;
-  const helpEl = help ? h('small', { class: 'help', id: helpId }, help) : null;
-  if (helpId) input.setAttribute('aria-describedby', helpId);
-  const box = suffix ? h('span', { class: 'input-wrap' }, input, h('span', { class: 'suffix' }, suffix)) : input;
-  return h('label', { class: 'field' }, h('span', { class: 'field-label' }, label), box, helpEl);
+  const box = suffix ? unitBox(input, suffix) : input;
+  const name = h('span', { class: 'field-label' }, label, suffix ? h('span', { class: 'sr-only' }, ` (${suffix})`) : null);
+  if (!help) return h('label', { class: 'field' }, name, box);
+  return h('div', { class: 'field' }, h('label', { class: 'field-in' }, name, box), helpText(input, help));
+}
+
+/** ช่องกรอก + หน่วยท้ายช่อง (หน่วยซ่อนจากโปรแกรมอ่านหน้าจอ ให้ใส่หน่วยในป้ายชื่อแทน) */
+export const unitBox = (input, unit) => h('span', { class: 'input-wrap' }, input, h('span', { class: 'suffix', 'aria-hidden': 'true' }, unit));
+
+/** ข้อความช่วยใต้ช่อง ผูกกับช่องด้วย aria-describedby */
+export function helpText(input, text) {
+  const id = nextId('help');
+  input.setAttribute('aria-describedby', id);
+  return h('small', { class: 'help', id }, text);
 }
 
 /**
