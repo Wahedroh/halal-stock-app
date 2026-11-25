@@ -1,4 +1,4 @@
-import { h, infoButton, alertBadge, halalBadge } from './components.js';
+import { h, infoButton, alertBadge, halalBadge, settle } from './components.js';
 import { buildStockView, applyPlanSave, shouldSavePeak, errorMessage, SUGGEST_NOTE } from './stockView.js';
 import { fmtPct, fmtUsd } from '../lib/metrics.js';
 import { listTxns, addTxn, deleteTxn, getHalal, saveHalal, getPlan, savePlan, setWatchlist } from '../lib/store.js';
@@ -7,7 +7,6 @@ import { cleanSymbol } from './userDoc.js';
 const today = () => new Date().toISOString().slice(0, 10);
 const row = (label, value, term) => h('div', { class: 'kv' }, h('span', {}, label, term ? infoButton(term) : null), h('b', {}, value));
 const posNum = (v) => { const n = Number(String(v).trim()); return Number.isFinite(n) && n > 0 ? n : null; };
-const settle = async (p) => { try { return { ok: true, v: await p }; } catch (e) { return { ok: false, e }; } };
 
 export async function renderStock(root, ctx, rawSym) {
   const sym = cleanSymbol(rawSym) || ctx.user.watchlist[0] || '';

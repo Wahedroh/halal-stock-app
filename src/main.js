@@ -4,6 +4,9 @@ import { renderNav } from './ui/nav.js';
 import { startRouter } from './ui/router.js';
 import { renderSettings } from './ui/settings.js';
 import { renderStock } from './ui/stock.js';
+import { renderPortfolio } from './ui/portfolio.js';
+import { renderGoals } from './ui/goals.js';
+import { renderGuide } from './ui/guide.js';
 import { mergeUser } from './ui/userDoc.js';
 import { createFinnhub } from './lib/finnhub.js';
 import { onUser, signIn, ensureUserDoc, getUser } from './lib/store.js';
@@ -39,7 +42,9 @@ async function start(user) {
     view._tok = (view._tok ?? 0) + 1; // ยกเลิกหน้าเดิมที่ยังโหลดค้าง
     if (route.name === 'settings') renderSettings(view, ctx);
     else if (route.name === 'stock') renderStock(view, ctx, route.sym);
-    else view.replaceChildren(h('h1', {}, { portfolio: 'พอร์ต', goals: 'เป้าหมาย', guide: 'คู่มือ' }[route.name]), h('p', { class: 'sub' }, 'กำลังสร้าง'));
+    else if (route.name === 'goals') renderGoals(view, ctx);
+    else if (route.name === 'guide') renderGuide(view);
+    else renderPortfolio(view, ctx);
   });
 }
 

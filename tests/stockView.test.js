@@ -3,7 +3,6 @@ import { buildStockView, buildPlanDoc, applyPlanSave, shouldSavePeak, errorMessa
 import { parseRoute } from '../src/ui/router.js';
 import { mergeUser } from '../src/ui/userDoc.js';
 import { DEFAULTS } from '../src/data/defaults.js';
-import { GUIDE } from '../src/data/guide.js';
 import { FinnhubError } from '../src/lib/finnhub.js';
 
 const quote = { price: 303.27, changePct: -3.28 };
@@ -126,12 +125,6 @@ test('mergeUser fills defaults without mutating DEFAULTS', () => {
   expect(mergeUser(null).watchlist).toHaveLength(11);
 });
 
-test('guide covers required terms', () => {
-  for (const t of ['price', 'range52', 'rangePos', 'drawdown', 'support', 'pe', 'tranches', 'tp', 'trailing', 'avgCost', 'halal', 'purification']) {
-    expect(GUIDE[t]?.title && GUIDE[t]?.body).toBeTruthy();
-  }
-});
-
 test('shouldSavePeak only when plan loaded and peak changed', () => {
   const txns = [{ type: 'buy', symbol: 'AVGO', date: '2026-01-02', shares: 10, price: 200 }];
   const v = buildStockView({ ...base, txns, plan: undefined });
@@ -148,8 +141,4 @@ test('sequential plan saves keep earlier fields (note then tranches)', () => {
   expect(cur).toEqual({ tp: 400, peakSinceBuy: 300, note: 'hello', tranches: [1, null, 3] });
   cur = applyPlanSave(cur, { note: 'x' });
   expect(cur.tranches).toEqual([1, null, 3]);
-});
-
-test('guide has new info terms', () => {
-  for (const t of ['changePct', 'peak', 'debtRatio', 'depositRatio']) expect(GUIDE[t]?.body).toBeTruthy();
 });

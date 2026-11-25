@@ -33,3 +33,6 @@ export const alertBadge = (a) => h('span', { class: 'badge alert' }, `ใกล�
 
 export const HALAL_LABELS = { pass: 'ผ่านเกณฑ์ AAOIFI', fail: 'ไม่ผ่าน', unchecked: 'ยังไม่ได้ตรวจ' };
 export const halalBadge = (status) => h('span', { class: `badge halal-${status}` }, HALAL_LABELS[status] ?? HALAL_LABELS.unchecked);
+
+/** รอ promise โดยไม่ throw: { ok, v } | { ok:false, e } */
+export const settle = async (p) => { try { return { ok: true, v: await p }; } catch (e) { return { ok: false, e }; } };
