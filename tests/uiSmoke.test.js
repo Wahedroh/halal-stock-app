@@ -81,3 +81,12 @@ test('goals page', async () => {
   expect(root.textContent).toContain('เป้าปันผล');
   expect(root.textContent).not.toContain('null');
 });
+test('guide page renders one section per term (no stringified arrays)', async () => {
+  const { renderGuide } = await import('../src/ui/guide.js');
+  const { GUIDE } = await import('../src/data/guide.js');
+  const root = new Node('main');
+  renderGuide(root);
+  expect(root.children.every((c) => c instanceof Node)).toBe(true);
+  expect(find(root, (n) => n.tag === 'section').length).toBe(Object.keys(GUIDE).length);
+  expect(root.textContent).not.toContain('[object');
+});
