@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { rangePosition, drawdown, distanceFromSupport, fmtPct, fmtUsd } from '../src/lib/metrics.js';
+import { rangePosition, drawdown, distanceFromSupport, fmtPct, fmtUsd, fmtShares } from '../src/lib/metrics.js';
 
 test('AVGO example from screenshot', () => {
   expect(rangePosition(303.27, 289.77, 495)).toBeCloseTo(0.0658, 3);
@@ -20,4 +20,12 @@ test('formatters', () => {
   expect(fmtUsd(303.27)).toBe('$303.27');
   expect(fmtUsd(-5)).toBe('-$5.00');
   expect(fmtUsd(null)).toBe('—');
+});
+
+test('fmtShares at most 6 decimals', () => {
+  expect(fmtShares(0.30000000000000004)).toBe('0.3');
+  expect(fmtShares(5.55e-17)).toBe('0');
+  expect(fmtShares(1.123456789)).toBe('1.123457');
+  expect(fmtShares(10)).toBe('10');
+  expect(fmtShares(null)).toBe('—');
 });

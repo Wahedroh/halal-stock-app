@@ -2,7 +2,7 @@ import { h, infoButton, alertBadge, settle } from './components.js';
 import { buildPortfolioView, fmtSigned } from './portfolioView.js';
 import { buildGoalsView } from './goalsView.js';
 import { errorMessage } from './stockView.js';
-import { fmtPct, fmtUsd } from '../lib/metrics.js';
+import { fmtPct, fmtUsd, fmtShares } from '../lib/metrics.js';
 import { listTxns, getPlan, setWatchlist } from '../lib/store.js';
 import { cleanSymbol } from './userDoc.js';
 
@@ -58,7 +58,7 @@ export async function renderPortfolio(root, ctx) {
   const holdRows = view.holdings.map((x) => h('a', { class: 'row-link', href: `#/stock/${encodeURIComponent(x.symbol)}` },
     h('div', { class: 'kv' }, h('b', {}, x.symbol), h('span', {}, x.price === null ? '—' : fmtUsd(x.price),
       x.changePct === null ? null : h('span', { class: signCls(x.changePct) }, ` ${x.changePct.toFixed(2)}%`))),
-    h('div', { class: 'sub' }, `${x.shares} หุ้น · ต้นทุน ${fmtUsd(x.avgCost)} · มูลค่า ${x.marketValue === null ? '—' : fmtUsd(x.marketValue)} · `,
+    h('div', { class: 'sub' }, `${fmtShares(x.shares)} หุ้น · ต้นทุน ${fmtUsd(x.avgCost)} · มูลค่า ${x.marketValue === null ? '—' : fmtUsd(x.marketValue)} · `,
       h('span', { class: signCls(x.pnl) }, `${fmtSigned(x.pnl)} (${fmtPct(x.pnlPct)})`)),
     x.alerts.length ? h('div', {}, x.alerts.map(alertBadge)) : null));
   const holdCard = h('div', { class: 'card' }, h('h2', {}, 'หุ้นที่ถือ'),

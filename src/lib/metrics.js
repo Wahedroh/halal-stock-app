@@ -30,3 +30,10 @@ export function fmtUsd(x) {
   const s = Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${x < 0 ? '-' : ''}$${s}`;
 }
+
+/** จำนวนหุ้น (ทศนิยมไม่เกิน 6 ตำแหน่ง) */
+export function fmtShares(x) {
+  if (typeof x !== 'number' || !Number.isFinite(x)) return '—';
+  const v = Math.round(x * 1e6) / 1e6;
+  return (Object.is(v, -0) ? 0 : v).toLocaleString('en-US', { maximumFractionDigits: 6 });
+}

@@ -1,6 +1,6 @@
 import { h, infoButton, alertBadge, halalBadge, settle } from './components.js';
 import { buildStockView, applyPlanSave, shouldSavePeak, errorMessage, SUGGEST_NOTE } from './stockView.js';
-import { fmtPct, fmtUsd } from '../lib/metrics.js';
+import { fmtPct, fmtUsd, fmtShares } from '../lib/metrics.js';
 import { listTxns, addTxn, deleteTxn, getHalal, saveHalal, getPlan, savePlan, setWatchlist } from '../lib/store.js';
 import { cleanSymbol } from './userDoc.js';
 
@@ -122,7 +122,7 @@ export async function renderStock(root, ctx, rawSym) {
     view.positionError ? h('p', { class: 'msg err' }, view.positionError) : null,
     view.txns.length === 0 ? h('p', { class: 'sub' }, 'ยังไม่มีรายการ') : view.txns.map((t) => h('div', { class: 'kv' },
       h('span', {}, `${t.date} ${{ buy: 'ซื้อ', sell: 'ขาย', dividend: 'ปันผล' }[t.type]}`),
-      h('span', {}, t.type === 'dividend' ? fmtUsd(t.amount) : `${t.shares} @ ${fmtUsd(t.price)}`,
+      h('span', {}, t.type === 'dividend' ? fmtUsd(t.amount) : `${fmtShares(t.shares)} @ ${fmtUsd(t.price)}`,
         h('button', { type: 'button', class: 'link', onclick: async () => { if (confirm('ลบรายการนี้?')) { await deleteTxn(ctx.uid, t.id); rerender(); } } }, 'ลบ')))),
     h('form', { onsubmit: addForm }, type, date, shares, price, fee, amount, h('button', { type: 'submit' }, 'เพิ่มรายการ')));
 

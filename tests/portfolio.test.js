@@ -66,3 +66,32 @@ test('multi-symbol summary', () => {
   expect(s.dividends).toBeCloseTo(5);
   expect(s.returnPct).toBeCloseTo(25/300);
 });
+test('fractional shares: 0.1 + 0.2 - 0.3 is flat', () => {
+  const p = position([
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:0.1,price:10},
+    {type:'buy',symbol:'A',date:'2026-01-02',shares:0.2,price:10},
+    {type:'sell',symbol:'A',date:'2026-01-03',shares:0.3,price:12},
+  ],'A');
+  expect(p.shares).toBe(0); expect(p.avgCost).toBe(0); expect(p.realized).toBeCloseTo(0.6);
+  expect(portfolioSummary([
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:0.1,price:10},
+    {type:'buy',symbol:'A',date:'2026-01-02',shares:0.2,price:10},
+    {type:'sell',symbol:'A',date:'2026-01-03',shares:0.3,price:12},
+  ], {A: 12}).invested).toBe(0);
+});
+test('fractional shares: 0.3 - 0.1 - 0.2 is allowed and flat', () => {
+  const p = position([
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:0.3,price:10},
+    {type:'sell',symbol:'A',date:'2026-01-02',shares:0.1,price:10},
+    {type:'sell',symbol:'A',date:'2026-01-03',shares:0.2,price:10},
+  ],'A');
+  expect(p.shares).toBe(0); expect(p.avgCost).toBe(0);
+});
+test('fractional oversell beyond tolerance still rejected; shares rounded to 8 dp', () => {
+  expect(() => position([
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:0.3,price:10},
+    {type:'sell',symbol:'A',date:'2026-01-02',shares:0.300001,price:10},
+  ],'A')).toThrow('ขายเกินจำนวนที่ถือ');
+  const p = position([{type:'buy',symbol:'A',date:'2026-01-01',shares:0.1,price:1},{type:'buy',symbol:'A',date:'2026-01-01',shares:0.2,price:1}],'A');
+  expect(p.shares).toBe(0.3);
+});
