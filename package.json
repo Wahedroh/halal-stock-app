@@ -11,5 +11,8 @@
     "vitest": "^5.1.1"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "firebase": "^13.4.0"
+  }
 }
