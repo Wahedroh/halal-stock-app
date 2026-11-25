@@ -110,3 +110,20 @@ test('fmtSigned', () => {
   expect(fmtSigned(12.5)).toBe('+$12.50');
   expect(fmtSigned(-3)).toBe('-$3.00');
 });
+
+test('display formatting helpers', async () => {
+  const { fmtSignedPct, fmtChangePct, pnlWord, fmtThb } = await import('../src/ui/portfolioView.js');
+  expect(fmtSignedPct(0.065)).toBe('+6.5%');
+  expect(fmtSignedPct(-0.0333)).toBe('-3.3%');
+  expect(fmtSignedPct(0)).toBe('+0.0%');
+  expect(fmtSignedPct(null)).toBe('—');
+  expect(fmtChangePct(-3.28)).toBe('-3.28%');
+  expect(fmtChangePct(1.2)).toBe('+1.20%');
+  expect(fmtChangePct(undefined)).toBe('—');
+  expect(pnlWord(-1)).toBe('ขาดทุน');
+  expect(pnlWord(5)).toBe('กำไร');
+  expect(pnlWord(null)).toBe('กำไร');
+  expect(fmtThb(40000)).toBe('40,000');
+  expect(fmtThb(3199.6)).toBe('3,200');
+  expect(fmtThb(NaN)).toBe('—');
+});

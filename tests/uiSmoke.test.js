@@ -45,13 +45,16 @@ test('stock page renders and per-form messages work', async () => {
   const shares = find(root, (n) => n.tag === 'input' && n.attrs.step === '1')[0];
   expect(shares.attrs).toMatchObject({ type: 'number', min: '1', inputmode: 'numeric' });
   // เปลี่ยนเป็นปันผล: ล้างและปิดช่องจำนวนหุ้น/ราคา (ค่าค้างเช่น 1.5 จะไม่บล็อกการส่งฟอร์ม) · เปลี่ยนกลับแล้วเปิดใหม่
-  const type = find(root, (n) => n.tag === 'select')[0];
+  // ประเภทรายการเป็นปุ่มแบ่งส่วน (radio) ค่าเดิม buy/sell/dividend
+  const radios = find(root, (n) => n.tag === 'input' && n.attrs.type === 'radio');
+  expect(radios.map((r) => r.attrs.value)).toEqual(['buy', 'sell', 'dividend']);
+  const pick = (v) => radios.find((r) => r.attrs.value === v).listeners.change[0]();
   const priceField = find(root, (n) => n.tag === 'label' && n.textContent.startsWith('ราคาต่อหุ้น (USD)'))[0];
   const price = find(priceField, (n) => n.tag === 'input')[0];
   shares.value = '1.5'; price.value = '10';
-  type.value = 'dividend'; type.listeners.change[0]();
+  pick('dividend');
   expect([shares.value, shares.disabled, price.value, price.disabled]).toEqual(['', true, '', true]);
-  type.value = 'buy'; type.listeners.change[0]();
+  pick('buy');
   expect([shares.disabled, price.disabled]).toEqual([false, false]);
 });
 test('portfolio renders with broken symbol named', async () => {
@@ -60,6 +63,10 @@ test('portfolio renders with broken symbol named', async () => {
   expect(root.textContent).toContain('MSFT ขายเกินจำนวนที่ถือ');
   expect(root.textContent).toContain('AVGO');
   expect(root.textContent).not.toContain('null');
+});
+test('alert badge spaces the level label', async () => {
+  const { alertBadge } = await import('../src/ui/components.js');
+  expect(alertBadge({ label: 'TP', distance: 0.02 }).textContent).toBe('ใกล้ TP 2.0%');
 });
 test('invalid route symbol', async () => {
   const root = new Node('main');

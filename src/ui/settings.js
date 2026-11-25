@@ -1,4 +1,4 @@
-import { h, field } from './components.js';
+import { h, field, pageHeader, cardTitle } from './components.js';
 import { saveSettings, signOut } from '../lib/store.js';
 import { errorText } from '../lib/errors.js';
 
@@ -8,7 +8,7 @@ const round = (x) => Math.round(x * 1e6) / 1e6;
 
 export function renderSettings(root, ctx) {
   const s = ctx.user.settings;
-  const msg = h('p', { class: 'msg' });
+  const msg = h('p', { class: 'msg', 'aria-live': 'polite' });
   const inp = (value, extra = {}) => h('input', { value: value ?? '', inputmode: 'decimal', ...extra });
 
   const key = inp(s.finnhubKey, { type: 'password', inputmode: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'Finnhub API key' });
@@ -39,15 +39,16 @@ export function renderSettings(root, ctx) {
   function fail(text) { msg.className = 'msg err'; msg.textContent = text; }
 
   root.replaceChildren(
-    h('h1', {}, 'ตั้งค่า'),
+    pageHeader({ sticker: 'ตั้งค่า', title: 'ตั้งค่าแอป', hand: 'API key · อัตราแลกเปลี่ยน · สูตรแผนซื้อ' }),
     h('form', { class: 'card', onsubmit: save },
-      field('Finnhub API key', key),
-      field('อัตราแลกเปลี่ยน (บาทต่อ USD)', fx),
-      h('div', { class: 'row3' }, field('ไม้ 1 (ลด %)', t[0]), field('ไม้ 2 (ลด %)', t[1]), field('ไม้ 3 (ลด %)', t[2])),
-      field('Trailing เริ่มเมื่อกำไรเกิน (%)', act),
-      field('Trailing ขายเมื่อย่อจากจุดสูงสุด (%)', trail),
-      field('เตือนเมื่อราคาห่างไม่เกิน (%)', near),
-      field('ภาษีหัก ณ ที่จ่ายปันผล (%)', wht),
-      h('button', { type: 'submit' }, 'บันทึก'), msg),
-    h('button', { type: 'button', class: 'secondary', onclick: () => signOut().catch((e) => fail(errorText(e))) }, 'ออกจากระบบ'));
+      cardTitle('ข้อมูลและสูตร'),
+      field('Finnhub API key', key, { help: 'ขอ key ฟรีได้ที่ finnhub.io' }),
+      field('อัตราแลกเปลี่ยน', fx, { suffix: 'บาท/USD' }),
+      h('div', { class: 'row3' }, field('ไม้ 1 ลด', t[0], { suffix: '%' }), field('ไม้ 2 ลด', t[1], { suffix: '%' }), field('ไม้ 3 ลด', t[2], { suffix: '%' })),
+      field('Trailing เริ่มเมื่อกำไรเกิน', act, { suffix: '%' }),
+      field('Trailing ขายเมื่อย่อจากจุดสูงสุด', trail, { suffix: '%' }),
+      field('เตือนเมื่อราคาห่างไม่เกิน', near, { suffix: '%' }),
+      field('ภาษีหัก ณ ที่จ่ายปันผล', wht, { suffix: '%' }),
+      h('button', { type: 'submit', class: 'btn block' }, 'บันทึก'), msg),
+    h('div', { class: 'pad' }, h('button', { type: 'button', class: 'btn ghost block', onclick: () => signOut().catch((e) => fail(errorText(e))) }, 'ออกจากระบบ')));
 }
