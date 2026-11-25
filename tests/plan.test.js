@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { buyTranches, takeProfit, trailingState, nearAlerts } from '../src/lib/plan.js';
+import { buyTranches, takeProfit, trailingState, nearAlerts, peakState } from '../src/lib/plan.js';
 
 test('tranches at -5/-12/-20%', () => {
   expect(buyTranches(100)).toEqual([95, 88, 80]);
@@ -45,4 +45,16 @@ test('near alerts sorted by distance, skip invalid levels', () => {
   ]);
   expect(r.map(a=>a.label)).toEqual(['B','A']);
   expect(r[0].distance).toBeCloseTo(0.005);
+});
+
+test('peakState: stored peak only counts for the same holding period', () => {
+  expect(peakState({ storedPeak: 150, storedStart: '2026-01-01', start: '2026-01-01', price: 120 })).toEqual({ peak: 150, changed: false });
+  expect(peakState({ storedPeak: 150, storedStart: '2026-01-01', start: '2026-01-01', price: 160 })).toEqual({ peak: 160, changed: true });
+  // ขายหมดแล้วซื้อใหม่: จุดสูงสุดเก่าไม่นับ
+  expect(peakState({ storedPeak: 150, storedStart: '2026-01-01', start: '2026-05-01', price: 120 })).toEqual({ peak: 120, changed: true });
+  // แผนเก่าที่ไม่มีวันเริ่มรอบถือ -> ไม่นับ
+  expect(peakState({ storedPeak: 150, start: '2026-01-01', price: 120 })).toEqual({ peak: 120, changed: true });
+  expect(peakState({ storedPeak: 150, storedStart: '2026-01-01', start: null, price: 120 })).toEqual({ peak: null, changed: false });
+  expect(peakState({ storedPeak: 150, storedStart: '2026-01-01', start: '2026-01-01', price: null })).toEqual({ peak: 150, changed: false });
+  expect(peakState({ start: '2026-01-01', price: null })).toEqual({ peak: null, changed: false });
 });

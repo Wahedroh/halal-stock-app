@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { buildStockView, buildPlanDoc, applyPlanSave, shouldSavePeak, errorMessage } from '../src/ui/stockView.js';
+import { buildStockView, buildPlanDoc, applyPlanSave, shouldSavePeak, errorMessage, peakPatch, planPatchFromForm, parseTxnForm, parseHalalForm, halalFormValues, halalPreview, halalFailText } from '../src/ui/stockView.js';
 import { parseRoute } from '../src/ui/router.js';
 import { mergeUser } from '../src/ui/userDoc.js';
 import { DEFAULTS } from '../src/data/defaults.js';
@@ -53,13 +53,14 @@ test('stale flag from any source', () => {
 
 test('position, peak update and trailing', () => {
   const txns = [{ type: 'buy', symbol: 'AVGO', date: '2026-01-02', shares: 10, price: 200 }];
-  const v = buildStockView({ ...base, txns, plan: { peakSinceBuy: 250 } });
+  const v = buildStockView({ ...base, txns, plan: { peakSinceBuy: 250, peakHoldingStart: '2026-01-02' } });
   expect(v.position.held).toBe(true);
+  expect(v.peakStart).toBe('2026-01-02');
   expect(v.peak).toBe(303.27);
   expect(v.peakChanged).toBe(true);
   expect(v.trailing.active).toBe(true);
   expect(v.trailing.stopPrice).toBe(266.88);
-  const v2 = buildStockView({ ...base, txns, plan: { peakSinceBuy: 400 } });
+  const v2 = buildStockView({ ...base, txns, plan: { peakSinceBuy: 400, peakHoldingStart: '2026-01-02' } });
   expect(v2.peakChanged).toBe(false);
   expect(v2.trailing.hit).toBe(true);
   const none = buildStockView({ ...base, plan: { peakSinceBuy: 100 } });
@@ -105,6 +106,8 @@ test('errorMessage by code', () => {
   expect(errorMessage(new FinnhubError('not_found'))).toBe('ไม่พบหุ้นนี้');
   expect(errorMessage(new FinnhubError('bad_key'))).toBe('API key ไม่ถูกต้อง ไปที่ตั้งค่า');
   expect(errorMessage(new FinnhubError('rate_limit'))).toBe('เรียกข้อมูลถี่เกินไป รอ 1 นาที');
+  expect(errorMessage(new FinnhubError('no_key'))).toBe('ยังไม่ได้ใส่ API key ไปที่ตั้งค่า');
+  expect(errorMessage(new FinnhubError('forbidden'))).toBe('API key ไม่ถูกต้อง หรือแพ็กฟรีไม่รองรับหุ้นตัวนี้');
 });
 
 test('parseRoute', () => {
@@ -112,6 +115,10 @@ test('parseRoute', () => {
   expect(parseRoute('#/stock/avgo ')).toEqual({ name: 'stock', sym: 'AVGO' });
   expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
   expect(parseRoute('#/zzz')).toEqual({ name: 'portfolio' });
+  expect(parseRoute('#/stock/')).toEqual({ name: 'stock', sym: '' });
+  expect(parseRoute('#/stock/brk.b')).toEqual({ name: 'stock', sym: 'BRK.B' });
+  expect(parseRoute('#/stock/%3Cscript%3E')).toEqual({ name: 'stock', sym: '', error: 'สัญลักษณ์หุ้นไม่ถูกต้อง' });
+  expect(parseRoute('#/stock/ABCDEFGHIJK')).toEqual({ name: 'stock', sym: '', error: 'สัญลักษณ์หุ้นไม่ถูกต้อง' });
 });
 
 test('mergeUser fills defaults without mutating DEFAULTS', () => {
@@ -141,4 +148,88 @@ test('sequential plan saves keep earlier fields (note then tranches)', () => {
   expect(cur).toEqual({ tp: 400, peakSinceBuy: 300, note: 'hello', tranches: [1, null, 3] });
   cur = applyPlanSave(cur, { note: 'x' });
   expect(cur.tranches).toEqual([1, null, 3]);
+});
+
+test('old peak ignored after selling everything and re-buying (no false trailing hit)', () => {
+  const txns = [
+    { type: 'buy', symbol: 'AVGO', date: '2026-01-02', shares: 10, price: 200 },
+    { type: 'sell', symbol: 'AVGO', date: '2026-03-01', shares: 10, price: 390 },
+    { type: 'buy', symbol: 'AVGO', date: '2026-06-01', shares: 5, price: 290 },
+  ];
+  const v = buildStockView({ ...base, txns, plan: { peakSinceBuy: 400, peakHoldingStart: '2026-01-02' } });
+  expect(v.peakStart).toBe('2026-06-01');
+  expect(v.peak).toBe(303.27);
+  expect(v.peakChanged).toBe(true);
+  expect(v.trailing.hit).toBe(false);
+  expect(peakPatch(v)).toEqual({ peakSinceBuy: 303.27, peakHoldingStart: '2026-06-01' });
+  const same = buildStockView({ ...base, txns, plan: { peakSinceBuy: 400, peakHoldingStart: '2026-06-01' } });
+  expect(same.peak).toBe(400);
+  expect(peakPatch(same)).toEqual({});
+});
+
+test('buildPlanDoc: null clears stored tp/tranches; keeps peakHoldingStart', () => {
+  const d = buildPlanDoc({ tp: 400, tranches: [1, 2, 3], peakSinceBuy: 300, peakHoldingStart: '2026-01-02' }, { tp: null, tranches: [null, null, null] });
+  expect(d).toEqual({ tranches: [null, null, null], peakSinceBuy: 300, peakHoldingStart: '2026-01-02' });
+  expect('tp' in d).toBe(false);
+});
+
+test('planPatchFromForm: suggestion -> null, edited -> value, empty TP -> null', () => {
+  const v = buildStockView(base); // tranches 288.11/266.88/242.62, tp 495
+  expect(planPatchFromForm(v, { tranches: ['288.11', '266.88', '242.62'], tp: '495' })).toEqual({ patch: { tranches: [null, null, null], tp: null } });
+  expect(planPatchFromForm(v, { tranches: ['280', '266.88', ''], tp: '' })).toEqual({ patch: { tranches: [280, null, null], tp: null } });
+  expect(planPatchFromForm(v, { tranches: ['', '', ''], tp: '480' })).toEqual({ patch: { tranches: [null, null, null], tp: 480 } });
+  expect(planPatchFromForm(v, { tranches: ['-1', '', ''], tp: '' }).error).toBe('ราคาต้องมากกว่า 0');
+  expect(planPatchFromForm(v, { tranches: ['', '', ''], tp: 'abc' }).error).toBe('ราคาต้องมากกว่า 0');
+  // เมื่อแอปเสนอไม่ได้ (ไม่มีราคา) ค่าที่กรอกถือว่าแก้เอง
+  const nv = buildStockView({ ...base, quote: null, metrics: null });
+  expect(planPatchFromForm(nv, { tranches: ['100', '', ''], tp: '200' }).patch).toEqual({ tranches: [100, null, null], tp: 200 });
+});
+
+test('plan saved from untouched form shows no "edited" and TP returns to 52W High', () => {
+  const v = buildStockView({ ...base, plan: { tp: 480, tranches: [290, null, null] } });
+  const { patch } = planPatchFromForm(v, { tranches: ['288.11', '266.88', '242.62'], tp: '' });
+  const v2 = buildStockView({ ...base, plan: applyPlanSave({ tp: 480, tranches: [290, null, null] }, patch) });
+  expect(v2.tranches.every((t) => !t.edited)).toBe(true);
+  expect(v2.tp).toEqual({ price: 495, suggested: 495, edited: false });
+});
+
+test('parseTxnForm: whole shares only, optional fee, dividend amount', () => {
+  expect(parseTxnForm('AVGO', { type: 'buy', date: '2026-01-02', shares: '3', price: '10', fee: '' })).toEqual({ txn: { symbol: 'AVGO', type: 'buy', date: '2026-01-02', shares: 3, price: 10 } });
+  expect(parseTxnForm('AVGO', { type: 'buy', date: '2026-01-02', shares: '1.5', price: '10' }).error).toBe('จำนวนหุ้นต้องเป็นจำนวนเต็ม');
+  expect(parseTxnForm('AVGO', { type: 'sell', date: '2026-01-02', shares: '0', price: '10' }).error).toBe('จำนวนหุ้นและราคาต้องมากกว่า 0');
+  expect(parseTxnForm('AVGO', { type: 'buy', date: '2026-01-02', shares: '2', price: '10', fee: '-1' }).error).toBe('ค่าธรรมเนียมต้องไม่ติดลบ');
+  expect(parseTxnForm('AVGO', { type: 'buy', date: '2026-01-02', shares: '2', price: '10', fee: '0.5' }).txn.fee).toBe(0.5);
+  expect(parseTxnForm('AVGO', { type: 'dividend', date: '2026-01-02', amount: '1.25', shares: '1.5' })).toEqual({ txn: { symbol: 'AVGO', type: 'dividend', date: '2026-01-02', amount: 1.25 } });
+  expect(parseTxnForm('AVGO', { type: 'dividend', date: '2026-01-02', amount: '' }).error).toBe('จำนวนเงินต้องมากกว่า 0');
+});
+
+test('halal form: million USD in, USD stored, round-trip prefill', () => {
+  const r = parseHalalForm({ debt: '67000', dep: '9348.5', imp: '1.2', src: ' Musaffa ' }, '2026-11-25');
+  expect(r.doc).toEqual({ interestDebt: 67e9, interestDeposits: 9348.5e6, impermissiblePct: 0.012, source: 'Musaffa', enteredAt: '2026-11-25' });
+  expect(halalFormValues(r.doc)).toEqual({ debt: '67000', dep: '9348.5', imp: '1.2', src: 'Musaffa' });
+  expect(halalFormValues(null)).toEqual({ debt: '', dep: '', imp: '', src: '' });
+  expect(parseHalalForm({ debt: '', dep: '1', imp: '1', src: 'x' }, 'd').error).toBeTruthy();
+  expect(parseHalalForm({ debt: '1', dep: '1', imp: '101', src: 'x' }, 'd').error).toBeTruthy();
+  expect(parseHalalForm({ debt: '1', dep: '1', imp: '1', src: ' ' }, 'd').error).toBe('ต้องระบุแหล่งที่มาของข้อมูลฮาลาล');
+});
+
+test('halal preview: live ratios, unit warning < 0.1%, failed rule', () => {
+  const p = halalPreview({ debt: '67000', dep: '9348', imp: '1' }, 1.4e12);
+  expect(p.debtRatio).toBeCloseTo(0.04786, 4);
+  expect(p.depositRatio).toBeCloseTo(0.00668, 4);
+  expect(p.warn).toBeNull();
+  expect(p.status).toBe('pass');
+  // กรอกเป็นพันล้าน (67) แทนล้าน -> สัดส่วนเล็กผิดปกติ
+  expect(halalPreview({ debt: '67', dep: '9348', imp: '1' }, 1.4e12).warn).toBe('ตรวจหน่วยอีกครั้ง: ตัวเลขควรเป็นล้าน USD');
+  const f = halalPreview({ debt: '500000', dep: '9348', imp: '6' }, 1.4e12);
+  expect(f.status).toBe('fail');
+  expect(f.failed).toEqual(['debt', 'impermissible']);
+  expect(halalFailText(f.failed)).toBe('ไม่ผ่าน: หนี้ดอกเบี้ยไม่ต่ำกว่า 30% ของ Market Cap · รายได้ต้องห้ามไม่ต่ำกว่า 5%');
+  const nm = halalPreview({ debt: '1', dep: '1', imp: '1' }, null);
+  expect(nm).toMatchObject({ noMarketCap: true, debtRatio: null, depositRatio: null, warn: null, status: 'unchecked' });
+});
+
+test('buildStockView halal exposes failed rules', () => {
+  const halal = { interestDebt: 5e11, interestDeposits: 1e9, impermissiblePct: 0.01, source: 's', enteredAt: '2026-11-25' };
+  expect(buildStockView({ ...base, halal }).halal.failed).toEqual(['debt']);
 });

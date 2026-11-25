@@ -30,3 +30,15 @@ export function nearAlerts(price, levels, within = 0.03) {
     .filter((a) => a.distance <= within)
     .sort((a, b) => a.distance - b.distance);
 }
+
+/**
+ * จุดสูงสุดหลังซื้อของรอบถือปัจจุบัน
+ * ใช้ค่าที่เก็บไว้เฉพาะเมื่อ storedStart ตรงกับ start (วันเริ่มรอบถือ) ไม่งั้นถือว่ายังไม่มี
+ * changed=true เมื่อควรบันทึกค่าใหม่ (ราคาปัจจุบันสูงกว่า หรือยังไม่มีค่าของรอบนี้)
+ */
+export function peakState({ storedPeak, storedStart, start, price } = {}) {
+  if (start === null || start === undefined) return { peak: null, changed: false };
+  const base = isPos(storedPeak) && storedStart === start ? storedPeak : null;
+  if (isPos(price) && (base === null || price > base)) return { peak: price, changed: true };
+  return { peak: base, changed: false };
+}

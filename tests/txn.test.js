@@ -1,5 +1,6 @@
 import { test, expect } from 'vitest';
 import { validateTxn } from '../src/lib/txn.js';
+import { normalizeSymbol } from '../src/lib/symbol.js';
 
 const ERR = 'ข้อมูลไม่ครบหรือไม่ถูกต้อง';
 test('valid buy normalizes symbol', () => {
@@ -22,7 +23,32 @@ test('invalid inputs throw', () => {
   for (const bad of [
     { ...base, shares: 0 }, { ...base, price: -1 }, { ...base, date: '2026-13-40' },
     { ...base, date: '05/01/2026' }, { ...base, type: 'split' }, { ...base, fee: -1 },
-    { ...base, symbol: ' ' }, { type: 'dividend', symbol: 'A', date: '2026-01-05', amount: 0 },
+    { type: 'dividend', symbol: 'A', date: '2026-01-05', amount: 0 },
     { ...base, shares: Infinity },
   ]) expect(() => validateTxn(bad)).toThrow(ERR);
+});
+test('invalid symbol -> Thai symbol error', () => {
+  const base = { type: 'buy', date: '2026-01-05', shares: 1, price: 1 };
+  for (const symbol of [' ', '', 'TOOLONGSYMBOL', 'A B', '<x>', 'ก', 7]) {
+    expect(() => validateTxn({ ...base, symbol })).toThrow('สัญลักษณ์หุ้นไม่ถูกต้อง');
+  }
+  expect(validateTxn({ ...base, symbol: ' brk.b ' }).symbol).toBe('BRK.B');
+});
+test('normalizeSymbol', () => {
+  expect(normalizeSymbol(' avgo ')).toBe('AVGO');
+  expect(normalizeSymbol('BRK-B')).toBe('BRK-B');
+  expect(normalizeSymbol('1234567890')).toBe('1234567890');
+  expect(normalizeSymbol('12345678901')).toBeNull();
+  expect(normalizeSymbol('')).toBeNull();
+  expect(normalizeSymbol(null)).toBeNull();
+  expect(normalizeSymbol('AV/GO')).toBeNull();
+  expect(normalizeSymbol('%3Cb%3E')).toBeNull();
+});
+test('whole shares only for buy/sell', () => {
+  const base = { type: 'buy', symbol: 'A', date: '2026-01-05', price: 10 };
+  expect(() => validateTxn({ ...base, shares: 1.5 })).toThrow('จำนวนหุ้นต้องเป็นจำนวนเต็ม');
+  expect(() => validateTxn({ ...base, shares: 0.3 })).toThrow('จำนวนหุ้นต้องเป็นจำนวนเต็ม');
+  expect(() => validateTxn({ ...base, type: 'sell', shares: 0.3 })).toThrow('จำนวนหุ้นต้องเป็นจำนวนเต็ม');
+  expect(validateTxn({ ...base, shares: 3 }).shares).toBe(3);
+  expect(validateTxn({ ...base, type: 'sell', shares: 3 }).shares).toBe(3);
 });

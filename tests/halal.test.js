@@ -16,11 +16,16 @@ test('deposits at 30% fail; ratios returned', () => {
 });
 test('missing deposits -> unchecked with null ratios', () => {
   const r = halalCheck({interestDebt:10, impermissiblePct:0.01, marketCap:100});
-  expect(r).toEqual({status:'unchecked', debtRatio:null, depositRatio:null, purificationPct:null});
+  expect(r).toEqual({status:'unchecked', debtRatio:null, depositRatio:null, purificationPct:null, failed:[]});
 });
 test('purificationAmount', () => {
   expect(purificationAmount(100, 0.0123)).toBe(1.23);
   expect(purificationAmount(33.333, 0.01)).toBe(0.33);
   expect(purificationAmount(100, null)).toBe(0);
   expect(purificationAmount(NaN, 0.01)).toBe(0);
+});
+test('failed lists which rules failed', () => {
+  expect(halalCheck({interestDebt:29, interestDeposits:10, impermissiblePct:0.01, marketCap:100}).failed).toEqual([]);
+  expect(halalCheck({interestDebt:30, interestDeposits:10, impermissiblePct:0.01, marketCap:100}).failed).toEqual(['debt']);
+  expect(halalCheck({interestDebt:1, interestDeposits:31, impermissiblePct:0.05, marketCap:100}).failed).toEqual(['deposits', 'impermissible']);
 });

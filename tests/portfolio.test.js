@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { position, portfolioSummary, dividendsLast12m } from '../src/lib/portfolio.js';
+import { position, portfolioSummary, dividendsLast12m, holdingStart, deleteTxnError, brokenSymbols } from '../src/lib/portfolio.js';
 
 const t = [
   {type:'buy',symbol:'SPUS',date:'2026-01-05',shares:10,price:50,fee:1},
@@ -66,7 +66,7 @@ test('multi-symbol summary', () => {
   expect(s.dividends).toBeCloseTo(5);
   expect(s.returnPct).toBeCloseTo(25/300);
 });
-test('fractional shares: 0.1 + 0.2 - 0.3 is flat', () => {
+test('legacy fractional data (defence): 0.1 + 0.2 - 0.3 is flat', () => {
   const p = position([
     {type:'buy',symbol:'A',date:'2026-01-01',shares:0.1,price:10},
     {type:'buy',symbol:'A',date:'2026-01-02',shares:0.2,price:10},
@@ -79,7 +79,7 @@ test('fractional shares: 0.1 + 0.2 - 0.3 is flat', () => {
     {type:'sell',symbol:'A',date:'2026-01-03',shares:0.3,price:12},
   ], {A: 12}).invested).toBe(0);
 });
-test('fractional shares: 0.3 - 0.1 - 0.2 is allowed and flat', () => {
+test('legacy fractional data (defence): 0.3 - 0.1 - 0.2 is allowed and flat', () => {
   const p = position([
     {type:'buy',symbol:'A',date:'2026-01-01',shares:0.3,price:10},
     {type:'sell',symbol:'A',date:'2026-01-02',shares:0.1,price:10},
@@ -87,11 +87,44 @@ test('fractional shares: 0.3 - 0.1 - 0.2 is allowed and flat', () => {
   ],'A');
   expect(p.shares).toBe(0); expect(p.avgCost).toBe(0);
 });
-test('fractional oversell beyond tolerance still rejected; shares rounded to 8 dp', () => {
+test('legacy fractional data (defence): oversell beyond tolerance still rejected; shares rounded to 8 dp', () => {
   expect(() => position([
     {type:'buy',symbol:'A',date:'2026-01-01',shares:0.3,price:10},
     {type:'sell',symbol:'A',date:'2026-01-02',shares:0.300001,price:10},
   ],'A')).toThrow('ขายเกินจำนวนที่ถือ');
   const p = position([{type:'buy',symbol:'A',date:'2026-01-01',shares:0.1,price:1},{type:'buy',symbol:'A',date:'2026-01-01',shares:0.2,price:1}],'A');
   expect(p.shares).toBe(0.3);
+});
+test('holdingStart = first buy after last flat; null when not held', () => {
+  const tx = [
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:2,price:10},
+    {type:'buy',symbol:'A',date:'2026-01-05',shares:1,price:10},
+    {type:'sell',symbol:'A',date:'2026-02-01',shares:3,price:12},
+    {type:'buy',symbol:'B',date:'2026-02-02',shares:1,price:1},
+  ];
+  expect(holdingStart(tx.slice(0, 2),'A')).toBe('2026-01-01');
+  expect(holdingStart(tx,'A')).toBeNull();
+  const rebuy = [...tx, {type:'buy',symbol:'A',date:'2026-03-01',shares:1,price:9}, {type:'buy',symbol:'A',date:'2026-03-02',shares:1,price:9}];
+  expect(holdingStart(rebuy,'A')).toBe('2026-03-01');
+  expect(holdingStart(rebuy,'B')).toBe('2026-02-02');
+  expect(holdingStart([],'A')).toBeNull();
+  // ขายบางส่วนไม่เปลี่ยนวันเริ่ม
+  expect(holdingStart([...tx.slice(0, 2), {type:'sell',symbol:'A',date:'2026-01-10',shares:1,price:12}],'A')).toBe('2026-01-01');
+});
+test('deleteTxnError refuses delete that would oversell', () => {
+  const tx = [
+    {id:'b1',type:'buy',symbol:'A',date:'2026-01-01',shares:2,price:10},
+    {id:'s1',type:'sell',symbol:'A',date:'2026-02-01',shares:2,price:12},
+    {id:'d1',type:'dividend',symbol:'A',date:'2026-01-15',amount:1},
+  ];
+  expect(deleteTxnError(tx,'b1')).toBe('ลบไม่ได้: จะทำให้ประวัติขายเกินจำนวนที่ถือ');
+  expect(deleteTxnError(tx,'s1')).toBeNull();
+  expect(deleteTxnError(tx,'d1')).toBeNull();
+  expect(deleteTxnError(tx,'nope')).toBeNull();
+});
+test('brokenSymbols names oversold histories', () => {
+  expect(brokenSymbols([
+    {type:'sell',symbol:'X',date:'2026-01-01',shares:1,price:1},
+    {type:'buy',symbol:'A',date:'2026-01-01',shares:1,price:1},
+  ])).toEqual(['X']);
 });

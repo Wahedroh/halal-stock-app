@@ -2,11 +2,12 @@ import { GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateC
 import { doc, getDoc, setDoc, getDocs, addDoc, deleteDoc, collection } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { DEFAULTS } from '../data/defaults.js';
-import { position } from './portfolio.js';
+import { position, deleteTxnError } from './portfolio.js';
 import { validateTxn } from './txn.js';
 
 export const signIn = () => signInWithPopup(auth, new GoogleAuthProvider());
 export const signOut = () => fbSignOut(auth);
+export const currentUser = () => auth.currentUser;
 export const onUser = (cb) => onAuthStateChanged(auth, cb);
 
 const userRef = (uid) => doc(db, 'users', uid);
@@ -40,7 +41,12 @@ export async function addTxn(uid, txn) {
   position([...existing, t], t.symbol); // throws on oversell
   return addDoc(collection(db, 'users', uid, 'txns'), t);
 }
-export const deleteTxn = (uid, id) => deleteDoc(doc(db, 'users', uid, 'txns', id));
+/** ลบรายการ แต่ปฏิเสธถ้าลบแล้วประวัติของหุ้นตัวนั้นจะขายเกินจำนวนที่ถือ */
+export async function deleteTxn(uid, id) {
+  const err = deleteTxnError(await listTxns(uid), id);
+  if (err) throw new Error(err);
+  return deleteDoc(doc(db, 'users', uid, 'txns', id));
+}
 
 const sub = (uid, col, id) => doc(db, 'users', uid, col, id);
 async function getSub(uid, col, id) {

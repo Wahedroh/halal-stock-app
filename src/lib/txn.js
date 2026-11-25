@@ -1,4 +1,7 @@
+import { normalizeSymbol, SYMBOL_ERR } from './symbol.js';
+
 const ERR = 'ข้อมูลไม่ครบหรือไม่ถูกต้อง';
+export const WHOLE_SHARES_ERR = 'จำนวนหุ้นต้องเป็นจำนวนเต็ม';
 const pos = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;
 
 function validDate(s) {
@@ -9,10 +12,12 @@ function validDate(s) {
 
 export function validateTxn(txn) {
   if (!txn || typeof txn !== 'object') throw new Error(ERR);
-  const symbol = typeof txn.symbol === 'string' ? txn.symbol.trim().toUpperCase() : '';
-  if (!symbol || !validDate(txn.date)) throw new Error(ERR);
+  const symbol = typeof txn.symbol === 'string' ? normalizeSymbol(txn.symbol) : null;
+  if (!symbol) throw new Error(SYMBOL_ERR);
+  if (!validDate(txn.date)) throw new Error(ERR);
   if (txn.type === 'buy' || txn.type === 'sell') {
     if (!pos(txn.shares) || !pos(txn.price)) throw new Error(ERR);
+    if (!Number.isInteger(txn.shares)) throw new Error(WHOLE_SHARES_ERR); // ซื้อขายเต็มหุ้นเท่านั้น
     const out = { ...txn, symbol };
     if (txn.fee !== undefined && txn.fee !== null) {
       if (typeof txn.fee !== 'number' || !Number.isFinite(txn.fee) || txn.fee < 0) throw new Error(ERR);
