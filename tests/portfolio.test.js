@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { position, portfolioSummary, dividendsLast12m, holdingStart, deleteTxnError, brokenSymbols } from '../src/lib/portfolio.js';
+import { position, portfolioSummary, dividendsLast12m, holdingStart, deleteTxnError, brokenSymbols, sortTxns, nextSeq } from '../src/lib/portfolio.js';
 
 const t = [
   {type:'buy',symbol:'SPUS',date:'2026-01-05',shares:10,price:50,fee:1},
@@ -127,4 +127,57 @@ test('brokenSymbols names oversold histories', () => {
     {type:'sell',symbol:'X',date:'2026-01-01',shares:1,price:1},
     {type:'buy',symbol:'A',date:'2026-01-01',shares:1,price:1},
   ])).toEqual(['X']);
+});
+
+// ลำดับรายการวันเดียวกัน: เรียงตาม seq (ลำดับที่บันทึก) ไม่ขึ้นกับลำดับที่ Firestore คืนมา
+const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));
+test('same-day sell-all then rebuy: holdingStart is rebuy date in any input order', () => {
+  const txns = [
+    { id: 'b1', type: 'buy', symbol: 'A', date: '2026-01-02', shares: 5, price: 10, seq: 100 },
+    { id: 's1', type: 'sell', symbol: 'A', date: '2026-03-01', shares: 5, price: 12, seq: 200 },
+    { id: 'b2', type: 'buy', symbol: 'A', date: '2026-03-01', shares: 3, price: 11, seq: 300 },
+  ];
+  for (const p of perms(txns)) {
+    expect(holdingStart(p, 'A')).toBe('2026-03-01');
+    expect(position(p, 'A')).toMatchObject({ shares: 3, avgCost: 11 });
+  }
+});
+test('same-day buy then sell from zero is valid in any input order', () => {
+  const txns = [
+    { id: 'b1', type: 'buy', symbol: 'A', date: '2026-03-01', shares: 4, price: 10, seq: 1 },
+    { id: 's1', type: 'sell', symbol: 'A', date: '2026-03-01', shares: 4, price: 12, seq: 2 },
+  ];
+  for (const p of perms(txns)) {
+    expect(position(p, 'A').shares).toBe(0);
+    expect(brokenSymbols(p)).toEqual([]);
+    expect(deleteTxnError(p, 's1')).toBeNull();
+    expect(deleteTxnError(p, 'b1')).toBe('ลบไม่ได้: จะทำให้ประวัติขายเกินจำนวนที่ถือ');
+    expect(holdingStart(p, 'A')).toBeNull();
+  }
+});
+test('legacy txns without seq keep input order on same date and sort before seq txns', () => {
+  const buy = { type: 'buy', symbol: 'A', date: '2026-03-01', shares: 4, price: 10 };
+  const sell = { type: 'sell', symbol: 'A', date: '2026-03-01', shares: 4, price: 12 };
+  expect(position([buy, sell], 'A').shares).toBe(0);
+  expect(() => position([sell, buy], 'A')).toThrow('ขายเกินจำนวนที่ถือ'); // เหมือนเดิม: ไม่มี seq ใช้ลำดับใน array
+  expect(sortTxns([sell, buy])).toEqual([sell, buy]);
+  const newer = { ...buy, shares: 1, seq: 5 };
+  expect(sortTxns([newer, buy, sell])).toEqual([buy, sell, newer]);
+  expect(sortTxns([{ ...buy, date: '2026-03-02' }, newer])[0]).toBe(newer); // วันที่มาก่อน seq
+});
+test('nextSeq is Date.now() but always above existing seq', () => {
+  expect(nextSeq([], 1000)).toBe(1000);
+  expect(nextSeq([{ seq: 500 }, { date: 'x' }], 1000)).toBe(1000);
+  expect(nextSeq([{ seq: 2000 }], 1000)).toBe(2001);
+  expect(Number.isFinite(nextSeq([{ seq: NaN }, { seq: '9' }], 7))).toBe(true);
+});
+test('already-broken history: deletions are allowed', () => {
+  const txns = [
+    { id: 'b1', type: 'buy', symbol: 'A', date: '2026-01-01', shares: 2, price: 10 },
+    { id: 's1', type: 'sell', symbol: 'A', date: '2026-01-02', shares: 5, price: 10 },
+    { id: 'd1', type: 'dividend', symbol: 'A', date: '2026-01-03', amount: 1 },
+  ];
+  expect(brokenSymbols(txns)).toEqual(['A']);
+  expect(deleteTxnError(txns, 'd1')).toBeNull();
+  expect(deleteTxnError(txns, 's1')).toBeNull();
 });

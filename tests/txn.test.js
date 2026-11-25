@@ -52,3 +52,9 @@ test('whole shares only for buy/sell', () => {
   expect(validateTxn({ ...base, shares: 3 }).shares).toBe(3);
   expect(validateTxn({ ...base, type: 'sell', shares: 3 }).shares).toBe(3);
 });
+test('seq passes through only when it is a finite number', () => {
+  const base = { type: 'buy', symbol: 'A', date: '2026-01-05', shares: 1, price: 1 };
+  expect(validateTxn({ ...base, seq: 1764000000000 }).seq).toBe(1764000000000);
+  expect(validateTxn({ type: 'dividend', symbol: 'A', date: '2026-01-05', amount: 1, seq: 3 }).seq).toBe(3);
+  for (const seq of [undefined, null, NaN, Infinity, '5']) expect('seq' in validateTxn({ ...base, seq })).toBe(false);
+});

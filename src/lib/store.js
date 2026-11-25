@@ -2,7 +2,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateC
 import { doc, getDoc, setDoc, getDocs, addDoc, deleteDoc, collection } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { DEFAULTS } from '../data/defaults.js';
-import { position, deleteTxnError } from './portfolio.js';
+import { position, deleteTxnError, sortTxns, nextSeq } from './portfolio.js';
 import { validateTxn } from './txn.js';
 
 export const signIn = () => signInWithPopup(auth, new GoogleAuthProvider());
@@ -32,12 +32,14 @@ export const setWatchlist = (uid, list) => setDoc(userRef(uid), { watchlist: lis
 
 export async function listTxns(uid) {
   const snap = await getDocs(collection(db, 'users', uid, 'txns'));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return sortTxns(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); // Firestore คืนตาม auto-ID (สุ่ม) จึงเรียงเองตามวันที่ + seq
 }
 
 export async function addTxn(uid, txn) {
-  const t = validateTxn(txn);
+  validateTxn(txn); // ตรวจก่อนโหลดข้อมูล
   const existing = await listTxns(uid);
+  // seq = ลำดับที่บันทึก (ตัวเลขเสมอ) ใช้เรียงรายการวันเดียวกัน เช่น ขายหมดแล้วซื้อใหม่ในวันเดียว
+  const t = validateTxn({ ...txn, seq: nextSeq(existing, Date.now()) });
   position([...existing, t], t.symbol); // throws on oversell
   return addDoc(collection(db, 'users', uid, 'txns'), t);
 }

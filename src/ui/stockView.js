@@ -1,6 +1,6 @@
 import { rangePosition, drawdown, distanceFromSupport } from '../lib/metrics.js';
 import { buyTranches, takeProfit, trailingState, nearAlerts, peakState } from '../lib/plan.js';
-import { position, holdingStart } from '../lib/portfolio.js';
+import { position, holdingStart, sortTxns } from '../lib/portfolio.js';
 import { WHOLE_SHARES_ERR } from '../lib/txn.js';
 import { halalCheck, purificationAmount } from '../lib/halal.js';
 import { DEFAULTS } from '../data/defaults.js';
@@ -81,7 +81,7 @@ export function buildStockView({ symbol, quote, metrics, profile, txns = [], pla
     halal: { ...h, source: halal?.source ?? null, enteredAt: halal?.enteredAt ?? null, purification },
     note: typeof plan?.note === 'string' ? plan.note : '',
     stale: Boolean(quote?.stale || metrics?.stale || profile?.stale),
-    txns: [...myTxns].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
+    txns: sortTxns(myTxns).reverse(), // ใหม่สุดก่อน
   };
 }
 
@@ -198,7 +198,7 @@ export function halalPreview(f, marketCapUsd) {
   const ok = mc !== null && mc > 0;
   const debtRatio = ok && d !== null ? (d * MILLION) / mc : null;
   const depositRatio = ok && dp !== null ? (dp * MILLION) / mc : null;
-  const warn = [debtRatio, depositRatio].some((r) => r !== null && r < 0.001) ? HALAL_UNIT_WARN : null;
+  const warn = [debtRatio, depositRatio].some((r) => r !== null && r > 0 && r < 0.001) ? HALAL_UNIT_WARN : null;
   const check = halalCheck({ interestDebt: d === null ? null : d * MILLION, interestDeposits: dp === null ? null : dp * MILLION, impermissiblePct: ip === null ? null : ip / 100, marketCap: mc });
   return { debtRatio, depositRatio, warn, noMarketCap: !ok, status: check.status, failed: check.failed };
 }

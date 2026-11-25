@@ -225,6 +225,9 @@ test('halal preview: live ratios, unit warning < 0.1%, failed rule', () => {
   expect(f.status).toBe('fail');
   expect(f.failed).toEqual(['debt', 'impermissible']);
   expect(halalFailText(f.failed)).toBe('ไม่ผ่าน: หนี้ดอกเบี้ยไม่ต่ำกว่า 30% ของ Market Cap · รายได้ต้องห้ามไม่ต่ำกว่า 5%');
+  // ไม่มีหนี้/เงินฝากเลย (0) ไม่ใช่ปัญหาหน่วย
+  expect(halalPreview({ debt: '0', dep: '0', imp: '0' }, 1.4e12).warn).toBeNull();
+  expect(halalPreview({ debt: '0', dep: '67', imp: '0' }, 1.4e12).warn).toBe('ตรวจหน่วยอีกครั้ง: ตัวเลขควรเป็นล้าน USD');
   const nm = halalPreview({ debt: '1', dep: '1', imp: '1' }, null);
   expect(nm).toMatchObject({ noMarketCap: true, debtRatio: null, depositRatio: null, warn: null, status: 'unchecked' });
 });
@@ -232,4 +235,16 @@ test('halal preview: live ratios, unit warning < 0.1%, failed rule', () => {
 test('buildStockView halal exposes failed rules', () => {
   const halal = { interestDebt: 5e11, interestDeposits: 1e9, impermissiblePct: 0.01, source: 's', enteredAt: '2026-11-25' };
   expect(buildStockView({ ...base, halal }).halal.failed).toEqual(['debt']);
+});
+
+test('history list is newest first, same-day ordered by seq', () => {
+  const txns = [
+    { id: 'b2', type: 'buy', symbol: 'AVGO', date: '2026-03-01', shares: 3, price: 11, seq: 300 },
+    { id: 'b1', type: 'buy', symbol: 'AVGO', date: '2026-01-02', shares: 5, price: 10, seq: 100 },
+    { id: 's1', type: 'sell', symbol: 'AVGO', date: '2026-03-01', shares: 5, price: 12, seq: 200 },
+  ];
+  const v = buildStockView({ ...base, txns });
+  expect(v.txns.map((t) => t.id)).toEqual(['b2', 's1', 'b1']);
+  expect(v.peakStart).toBe('2026-03-01');
+  expect(v.positionError ?? null).toBeNull();
 });

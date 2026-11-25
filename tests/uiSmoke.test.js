@@ -44,6 +44,15 @@ test('stock page renders and per-form messages work', async () => {
   expect(root.textContent).toContain('ไม่มีอินเทอร์เน็ต');
   const shares = find(root, (n) => n.tag === 'input' && n.attrs.step === '1')[0];
   expect(shares.attrs).toMatchObject({ type: 'number', min: '1', inputmode: 'numeric' });
+  // เปลี่ยนเป็นปันผล: ล้างและปิดช่องจำนวนหุ้น/ราคา (ค่าค้างเช่น 1.5 จะไม่บล็อกการส่งฟอร์ม) · เปลี่ยนกลับแล้วเปิดใหม่
+  const type = find(root, (n) => n.tag === 'select')[0];
+  const priceField = find(root, (n) => n.tag === 'label' && n.textContent.startsWith('ราคาต่อหุ้น (USD)'))[0];
+  const price = find(priceField, (n) => n.tag === 'input')[0];
+  shares.value = '1.5'; price.value = '10';
+  type.value = 'dividend'; type.listeners.change[0]();
+  expect([shares.value, shares.disabled, price.value, price.disabled]).toEqual(['', true, '', true]);
+  type.value = 'buy'; type.listeners.change[0]();
+  expect([shares.disabled, price.disabled]).toEqual([false, false]);
 });
 test('portfolio renders with broken symbol named', async () => {
   const root = new Node('main');

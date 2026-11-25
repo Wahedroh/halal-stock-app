@@ -12,6 +12,13 @@ function validDate(s) {
 
 export function validateTxn(txn) {
   if (!txn || typeof txn !== 'object') throw new Error(ERR);
+  const out = validateFields(txn);
+  // seq (ลำดับที่บันทึก) ผ่านได้เฉพาะเมื่อเป็นตัวเลขจริง
+  if (typeof txn.seq !== 'number' || !Number.isFinite(txn.seq)) delete out.seq;
+  return out;
+}
+
+function validateFields(txn) {
   const symbol = typeof txn.symbol === 'string' ? normalizeSymbol(txn.symbol) : null;
   if (!symbol) throw new Error(SYMBOL_ERR);
   if (!validDate(txn.date)) throw new Error(ERR);

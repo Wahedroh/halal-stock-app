@@ -111,7 +111,12 @@ export async function renderStock(root, ctx, rawSym, symError) {
   const amount = h('input', { inputmode: 'decimal' });
   const fShares = field('จำนวนหุ้น (เต็มหุ้น)', shares), fPrice = field('ราคาต่อหุ้น (USD)', price);
   const fFee = field('ค่าธรรมเนียม (USD)', fee), fAmount = field('ปันผลที่ได้รับ (USD หลังหักภาษี)', amount);
-  const sync = () => { const d = type.value === 'dividend'; [fShares, fPrice, fFee].forEach((e) => (e.hidden = d)); fAmount.hidden = !d; };
+  const sync = () => {
+    const d = type.value === 'dividend';
+    [fShares, fPrice, fFee].forEach((e) => (e.hidden = d)); fAmount.hidden = !d;
+    // ช่องที่ซ่อน: ล้างค่าและปิดไว้ ไม่ให้ค่าค้าง (เช่น 1.5) บล็อกการส่งฟอร์มแบบเงียบ ๆ
+    [shares, price].forEach((i) => { if (d) i.value = ''; i.disabled = d; });
+  };
   type.addEventListener('change', sync); sync();
   async function addForm(e) {
     e.preventDefault();

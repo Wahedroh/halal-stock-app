@@ -1,5 +1,20 @@
-const sorted = (txns) =>
-  txns.map((x, i) => [x, i]).sort((a, b) => (a[0].date < b[0].date ? -1 : a[0].date > b[0].date ? 1 : a[1] - b[1])).map((p) => p[0]);
+// ลำดับรายการ: วันที่ → seq (ลำดับที่บันทึก) → ลำดับใน array · รายการเก่าที่ไม่มี seq มาก่อนรายการที่มี seq ในวันเดียวกัน
+const hasSeq = (x) => typeof x.seq === 'number' && Number.isFinite(x.seq);
+export function compareTxn(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  const sa = hasSeq(a), sb = hasSeq(b);
+  if (sa !== sb) return sa ? 1 : -1;
+  return sa ? a.seq - b.seq : 0;
+}
+export const sortTxns = (txns) =>
+  txns.map((x, i) => [x, i]).sort((a, b) => compareTxn(a[0], b[0]) || a[1] - b[1]).map((p) => p[0]);
+const sorted = sortTxns;
+
+/** seq ของรายการใหม่: เวลาที่บันทึก แต่ต้องมากกว่า seq เดิมทุกตัว (เผื่อนาฬิกาเครื่องถอยหลัง) */
+export function nextSeq(txns, now) {
+  const max = txns.reduce((m, x) => (hasSeq(x) && x.seq > m ? x.seq : m), -Infinity);
+  return Math.max(now, max + 1);
+}
 
 // ซื้อขายเต็มหุ้นเท่านั้น (validateTxn) · กันข้อมูลเก่าที่เป็นเศษหุ้น: ยอมคลาดเคลื่อน 1e-9 และปัดจำนวนหุ้นเป็น 8 ตำแหน่ง
 export const SHARE_EPS = 1e-9;
@@ -43,17 +58,20 @@ export function holdingStart(txns, symbol) {
   return shares > 0 ? start : null;
 }
 
-/** ข้อความ error ถ้าลบรายการ id แล้วประวัติของหุ้นตัวนั้นจะขายเกินจำนวนที่ถือ · null ถ้าลบได้ */
+const validHistory = (txns, symbol) => { try { position(txns, symbol); return true; } catch { return false; } };
+
+/** ข้อความ error ถ้าประวัติของหุ้นตัวนั้นถูกต้องอยู่ แต่ลบรายการ id แล้วจะขายเกินจำนวนที่ถือ · null ถ้าลบได้
+ *  (ถ้าประวัติเสียอยู่แล้ว ลบได้เสมอ เพื่อให้แก้ข้อมูลได้) */
 export function deleteTxnError(txns, id) {
   const t = txns.find((x) => x.id === id);
   if (!t) return null;
-  try { position(txns.filter((x) => x.id !== id), t.symbol); } catch { return 'ลบไม่ได้: จะทำให้ประวัติขายเกินจำนวนที่ถือ'; }
+  if (validHistory(txns, t.symbol) && !validHistory(txns.filter((x) => x.id !== id), t.symbol)) return 'ลบไม่ได้: จะทำให้ประวัติขายเกินจำนวนที่ถือ';
   return null;
 }
 
 /** หุ้นที่ประวัติขายเกินจำนวนที่ถือ (ข้อมูลเสีย) */
 export function brokenSymbols(txns) {
-  return [...new Set(txns.map((x) => x.symbol))].filter((s) => { try { position(txns, s); return false; } catch { return true; } });
+  return [...new Set(txns.map((x) => x.symbol))].filter((s) => !validHistory(txns, s));
 }
 
 export function portfolioSummary(txns, prices) {
