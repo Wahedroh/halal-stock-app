@@ -1,5 +1,5 @@
 import './styles.css';
-import { h } from './ui/components.js';
+import { h, pageHeader } from './ui/components.js';
 import { renderNav } from './ui/nav.js';
 import { startRouter } from './ui/router.js';
 import { renderSettings } from './ui/settings.js';
@@ -15,23 +15,27 @@ import { errorText } from './lib/errors.js';
 const app = document.querySelector('#app');
 let stopRouter = null;
 
+const brandHeader = () => pageHeader({ sticker: 'หุ้นฮาลาล · AAOIFI', title: 'พอร์ตหุ้นฮาลาล', hand: 'แผนซื้อ 3 ไม้ · คัดกรองฮาลาล · เป้าปันผล' });
+
 function signInScreen(error) {
-  app.replaceChildren(h('main', { class: 'center' }, h('h1', {}, 'พอร์ตหุ้นฮาลาล'),
-    h('button', { type: 'button', onclick: () => signIn().catch((e) => signInScreen(errorText(e))) }, 'เข้าสู่ระบบด้วย Google'),
-    error ? h('p', { class: 'msg err' }, error) : null));
+  app.replaceChildren(h('main', { class: 'view gate' }, brandHeader(),
+    h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'ยินดีต้อนรับ'),
+      h('p', { class: 'sub' }, 'เข้าสู่ระบบเพื่อดูพอร์ตและบันทึกการซื้อขายของครู'),
+      h('button', { type: 'button', class: 'btn block', onclick: () => signIn().catch((e) => signInScreen(errorText(e))) }, 'เข้าสู่ระบบด้วย Google'),
+      error ? h('p', { class: 'msg err', role: 'alert' }, error) : null)));
 }
 
 /** ล็อกอินแล้วแต่โหลดข้อมูลบัญชีไม่สำเร็จ: ลองใหม่ / ออกจากระบบ */
 function loadErrorScreen(e) {
-  const msg = h('p', { class: 'msg err' }, `โหลดข้อมูลบัญชีไม่สำเร็จ: ${errorText(e)}`);
-  app.replaceChildren(h('main', { class: 'center' }, h('h1', {}, 'พอร์ตหุ้นฮาลาล'), msg,
-    h('button', { type: 'button', onclick: () => {
+  const msg = h('p', { class: 'msg err', role: 'alert' }, `โหลดข้อมูลบัญชีไม่สำเร็จ: ${errorText(e)}`);
+  app.replaceChildren(h('main', { class: 'view gate' }, brandHeader(), h('section', { class: 'card' }, h('h2', { class: 'card-title' }, 'โหลดข้อมูลไม่สำเร็จ'), msg,
+    h('button', { type: 'button', class: 'btn block', onclick: () => {
       const u = currentUser();
       if (!u) { signInScreen(); return; }
-      app.textContent = 'กำลังโหลด…';
+      loadingScreen();
       start(u).catch(loadErrorScreen);
     } }, 'ลองใหม่'),
-    h('button', { type: 'button', class: 'secondary', onclick: () => signOut().catch((err) => { msg.textContent = errorText(err); }) }, 'ออกจากระบบ')));
+    h('button', { type: 'button', class: 'btn ghost block', onclick: () => signOut().catch((err) => { msg.textContent = errorText(err); }) }, 'ออกจากระบบ'))));
 }
 
 async function start(user) {
@@ -62,7 +66,11 @@ async function start(user) {
   });
 }
 
-app.textContent = 'กำลังโหลด…';
+function loadingScreen() {
+  app.replaceChildren(h('main', { class: 'view gate' }, brandHeader(), h('p', { class: 'loading', role: 'status' }, 'กำลังโหลด…')));
+}
+
+loadingScreen();
 onUser((user) => {
   if (!user) { stopRouter?.(); stopRouter = null; signInScreen(); return; }
   start(user).catch(loadErrorScreen);
