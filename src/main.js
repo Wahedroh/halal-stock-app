@@ -36,6 +36,7 @@ async function start(user) {
     const last = localStorage.getItem('lastSym') || ctx.user.watchlist[0] || '';
     navHolder.replaceChildren(renderNav(route.name, last ? `#/stock/${encodeURIComponent(last)}` : '#/stock/'));
     window.scrollTo(0, 0);
+    view._tok = (view._tok ?? 0) + 1; // ยกเลิกหน้าเดิมที่ยังโหลดค้าง
     if (route.name === 'settings') renderSettings(view, ctx);
     else if (route.name === 'stock') renderStock(view, ctx, route.sym);
     else view.replaceChildren(h('h1', {}, { portfolio: 'พอร์ต', goals: 'เป้าหมาย', guide: 'คู่มือ' }[route.name]), h('p', { class: 'sub' }, 'กำลังสร้าง'));

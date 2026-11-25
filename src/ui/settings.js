@@ -11,7 +11,7 @@ export function renderSettings(root, ctx) {
   const field = (label, input) => h('label', { class: 'field' }, h('span', {}, label), input);
   const inp = (value, extra = {}) => h('input', { value: value ?? '', inputmode: 'decimal', ...extra });
 
-  const key = inp(s.finnhubKey, { type: 'password', autocomplete: 'off', placeholder: 'Finnhub API key' });
+  const key = inp(s.finnhubKey, { type: 'password', inputmode: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'Finnhub API key' });
   const fx = inp(s.fx);
   const t = s.tranchePcts.map((p) => inp(round(p * 100)));
   const act = inp(round(s.trailActivate * 100));

@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { buildStockView, buildPlanDoc, errorMessage } from '../src/ui/stockView.js';
+import { buildStockView, buildPlanDoc, applyPlanSave, shouldSavePeak, errorMessage } from '../src/ui/stockView.js';
 import { parseRoute } from '../src/ui/router.js';
 import { mergeUser } from '../src/ui/userDoc.js';
 import { DEFAULTS } from '../src/data/defaults.js';
@@ -130,4 +130,26 @@ test('guide covers required terms', () => {
   for (const t of ['price', 'range52', 'rangePos', 'drawdown', 'support', 'pe', 'tranches', 'tp', 'trailing', 'avgCost', 'halal', 'purification']) {
     expect(GUIDE[t]?.title && GUIDE[t]?.body).toBeTruthy();
   }
+});
+
+test('shouldSavePeak only when plan loaded and peak changed', () => {
+  const txns = [{ type: 'buy', symbol: 'AVGO', date: '2026-01-02', shares: 10, price: 200 }];
+  const v = buildStockView({ ...base, txns, plan: undefined });
+  expect(v.peakChanged).toBe(true);
+  expect(shouldSavePeak(v, false)).toBe(false);
+  expect(shouldSavePeak(v, true)).toBe(true);
+  expect(shouldSavePeak(buildStockView(base), true)).toBe(false);
+});
+
+test('sequential plan saves keep earlier fields (note then tranches)', () => {
+  let cur = { tp: 400, peakSinceBuy: 300 };
+  cur = applyPlanSave(cur, { note: 'hello' });
+  cur = applyPlanSave(cur, { tranches: [1, null, 3], tp: undefined });
+  expect(cur).toEqual({ tp: 400, peakSinceBuy: 300, note: 'hello', tranches: [1, null, 3] });
+  cur = applyPlanSave(cur, { note: 'x' });
+  expect(cur.tranches).toEqual([1, null, 3]);
+});
+
+test('guide has new info terms', () => {
+  for (const t of ['changePct', 'peak', 'debtRatio', 'depositRatio']) expect(GUIDE[t]?.body).toBeTruthy();
 });

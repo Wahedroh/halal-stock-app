@@ -103,3 +103,9 @@ export const ERROR_TEXT = {
   network: 'เชื่อมต่อไม่ได้',
 };
 export const errorMessage = (e) => ERROR_TEXT[e?.code] ?? e?.message ?? ERROR_TEXT.network;
+
+/** บันทึกจุดสูงสุดอัตโนมัติได้เฉพาะเมื่อโหลดแผนสำเร็จ (กันเขียนทับแผนเดิม) */
+export const shouldSavePeak = (view, planOk) => Boolean(planOk && view?.peakChanged && view.peak !== null);
+
+/** ผสมแผนที่เพิ่งบันทึกเข้าสถานะในเครื่อง เพื่อไม่ให้การบันทึกครั้งถัดไปทับกัน */
+export const applyPlanSave = (plan, patch) => buildPlanDoc(plan, patch);

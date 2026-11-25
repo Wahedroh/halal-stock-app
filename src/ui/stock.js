@@ -1,5 +1,5 @@
 import { h, infoButton, alertBadge, halalBadge } from './components.js';
-import { buildStockView, buildPlanDoc, errorMessage, SUGGEST_NOTE } from './stockView.js';
+import { buildStockView, applyPlanSave, shouldSavePeak, errorMessage, SUGGEST_NOTE } from './stockView.js';
 import { fmtPct, fmtUsd } from '../lib/metrics.js';
 import { listTxns, addTxn, deleteTxn, getHalal, saveHalal, getPlan, savePlan, setWatchlist } from '../lib/store.js';
 import { cleanSymbol } from './userDoc.js';
@@ -12,6 +12,8 @@ const settle = async (p) => { try { return { ok: true, v: await p }; } catch (e)
 export async function renderStock(root, ctx, rawSym) {
   const sym = cleanSymbol(rawSym) || ctx.user.watchlist[0] || '';
   if (sym) localStorage.setItem('lastSym', sym);
+  const token = (root._tok = (root._tok ?? 0) + 1);
+  const stale = () => root._tok !== token;
   root.replaceChildren(h('p', {}, 'กำลังโหลด…'));
   if (!sym) { root.replaceChildren(searchBox(ctx), h('p', {}, 'ยังไม่มีหุ้นในรายชื่อเฝ้าดู')); return; }
 
@@ -20,14 +22,24 @@ export async function renderStock(root, ctx, rawSym) {
     settle(fh.quote(sym)), settle(fh.metrics(sym)), settle(fh.profile(sym)),
     settle(listTxns(ctx.uid)), settle(getPlan(ctx.uid, sym)), settle(getHalal(ctx.uid, sym)),
   ]);
+  if (stale()) return;
   const view = buildStockView({
     symbol: sym, quote: q.v, metrics: m.v, profile: p.v, txns: txns.v ?? [], plan: plan.v, halal: halal.v, settings: ctx.user.settings,
   });
   const errors = [q, m, p].filter((r) => !r.ok).map((r) => errorMessage(r.e));
   const rerender = () => renderStock(root, ctx, sym);
+  const loadErrors = [[txns, 'ประวัติซื้อขาย'], [plan, 'แผน'], [halal, 'ข้อมูลฮาลาล']].filter(([r]) => !r.ok).map(([, n]) => `โหลด${n}ไม่สำเร็จ`);
+  const planOk = plan.ok;
+  let curPlan = plan.v ?? null; // สถานะแผนล่าสุดในเครื่อง
+  const persistPlan = async (patch) => {
+    if (!planOk) throw new Error('โหลดแผนไม่สำเร็จ จึงยังบันทึกไม่ได้ ลองโหลดใหม่');
+    const doc = applyPlanSave(curPlan, patch);
+    await savePlan(ctx.uid, sym, doc);
+    curPlan = doc;
+  };
 
-  // จดจุดสูงสุดหลังซื้อเมื่อราคาทำสถิติใหม่
-  if (view.peakChanged) savePlan(ctx.uid, sym, buildPlanDoc(plan.v, { peakSinceBuy: view.peak })).catch(() => {});
+  // จดจุดสูงสุดหลังซื้อเมื่อราคาทำสถิติใหม่ (เฉพาะเมื่อโหลดแผนสำเร็จ)
+  if (shouldSavePeak(view, planOk)) persistPlan({ peakSinceBuy: view.peak }).catch(() => {});
 
   const msg = h('p', { class: 'msg' });
   const say = (t, ok) => { msg.className = ok ? 'msg ok' : 'msg err'; msg.textContent = t; };
@@ -38,11 +50,12 @@ export async function renderStock(root, ctx, rawSym) {
     h('div', { class: 'title' }, h('h1', {}, view.symbol), view.name ? h('span', { class: 'sub' }, view.name) : null,
       halalBadge(view.halal.status)),
     q.ok ? h('div', { class: 'price' }, h('b', {}, fmtUsd(view.price)),
-      h('span', { class: view.changePct < 0 ? 'neg' : 'pos' }, view.changePct === null ? '—' : `${view.changePct.toFixed(2)}%`), infoButton('price')) : null,
+      h('span', { class: view.changePct < 0 ? 'neg' : 'pos' }, view.changePct === null ? '—' : `${view.changePct.toFixed(2)}%`), infoButton('price'), infoButton('changePct')) : null,
     view.stale ? h('p', { class: 'msg warn' }, 'ข้อมูลเก่า (แสดงจากแคช)') : null,
     errors.length ? h('p', { class: 'msg err' }, [...new Set(errors)].join(' · ')) : null,
+    loadErrors.length ? h('p', { class: 'msg err' }, loadErrors.join(' · ')) : null,
     view.alerts.length ? h('div', {}, view.alerts.map(alertBadge)) : null);
-  if (stockErr && q.e?.code === 'not_found') { root.replaceChildren(header); return; }
+  if (stockErr && q.e?.code === 'not_found') { if (!stale()) root.replaceChildren(header); return; }
 
   const bar = h('div', { class: 'bar' }, h('i', { style: `left:${Math.min(100, Math.max(0, (view.rangePos ?? 0) * 100))}%` }));
   const metricsCard = h('div', { class: 'card' },
@@ -62,7 +75,7 @@ export async function renderStock(root, ctx, rawSym) {
     const tp = tpInput.value.trim() === '' ? null : posNum(tpInput.value);
     if (tr.some((v, i) => v === null && trInputs[i].value.trim() !== '') || (tp === null && tpInput.value.trim() !== '')) return say('ราคาต้องมากกว่า 0', false);
     try {
-      await savePlan(ctx.uid, sym, buildPlanDoc(plan.v, { tranches: tr, tp: tp ?? undefined, peakSinceBuy: view.peak ?? undefined }));
+      await persistPlan({ tranches: tr, tp: tp ?? undefined, peakSinceBuy: view.peak ?? undefined });
       say('บันทึกแผนแล้ว', true);
     } catch (err) { say(err.message, false); }
   }
@@ -75,8 +88,8 @@ export async function renderStock(root, ctx, rawSym) {
     h('label', { class: 'field' }, h('span', {}, `เป้าขาย${view.tp.edited ? ' · แก้เอง' : ''}`), tpInput),
     h('h2', {}, 'Trailing', infoButton('trailing')),
     view.position.held
-      ? h('div', {}, row('ต้นทุนเฉลี่ย', fmtUsd(view.position.avgCost), 'avgCost'), row('จุดสูงสุดหลังซื้อ', fmtUsd(view.peak)),
-        row('สถานะ', view.trailing.active ? `เปิด · ขายเมื่อ ≤ ${fmtUsd(view.trailing.stopPrice)}${view.trailing.hit ? ' · ถึงจุดแล้ว' : ''}` : 'ยังไม่เปิด'))
+      ? h('div', {}, row('ต้นทุนเฉลี่ย', fmtUsd(view.position.avgCost), 'avgCost'), row('จุดสูงสุดหลังซื้อ', fmtUsd(view.peak), 'peak'),
+        row('สถานะ Trailing', view.trailing.active ? `เปิด · ขายเมื่อ ≤ ${fmtUsd(view.trailing.stopPrice)}${view.trailing.hit ? ' · ถึงจุดแล้ว' : ''}` : 'ยังไม่เปิด', 'trailing'))
       : h('p', { class: 'sub' }, 'ยังไม่ได้ถือหุ้นตัวนี้'),
     h('button', { type: 'submit' }, 'บันทึกแผน'));
 
@@ -136,7 +149,7 @@ export async function renderStock(root, ctx, rawSym) {
   const halalCard = h('form', { class: 'card', onsubmit: halalForm },
     h('h2', {}, 'ฮาลาล', infoButton('halal')), h('div', {}, halalBadge(hv.status)),
     hv.source || hv.enteredAt ? h('p', { class: 'sub' }, `แหล่งที่มา: ${hv.source ?? '—'} · กรอกเมื่อ ${hv.enteredAt ?? '—'}`) : h('p', { class: 'sub' }, 'ยังไม่มีข้อมูล ไม่มีแหล่งที่มา'),
-    hv.status !== 'unchecked' ? h('div', {}, row('หนี้ดอกเบี้ย ÷ Market Cap', fmtPct(hv.debtRatio)), row('เงินฝากดอกเบี้ย ÷ Market Cap', fmtPct(hv.depositRatio)),
+    hv.status !== 'unchecked' ? h('div', {}, row('หนี้ดอกเบี้ย ÷ Market Cap', fmtPct(hv.debtRatio), 'debtRatio'), row('เงินฝากดอกเบี้ย ÷ Market Cap', fmtPct(hv.depositRatio), 'depositRatio'),
       row('ยอดชำระล้าง', fmtUsd(hv.purification.amount), 'purification'),
       h('p', { class: 'sub' }, `ปันผลรวมของตัวนี้ ${fmtUsd(hv.purification.dividends)} × ${fmtPct(hv.purification.pct)}`)) : null,
     hf.debt, hf.dep, hf.imp, hf.src, h('button', { type: 'submit' }, 'บันทึกข้อมูลฮาลาล'));
@@ -145,9 +158,10 @@ export async function renderStock(root, ctx, rawSym) {
   const note = h('textarea', { rows: '4', placeholder: 'ความเห็นของครู' }, view.note);
   const noteCard = h('div', { class: 'card' }, h('h2', {}, 'บันทึกความเห็น'), note,
     h('button', { type: 'button', onclick: async () => {
-      try { await savePlan(ctx.uid, sym, buildPlanDoc(plan.v, { note: note.value, peakSinceBuy: view.peak ?? undefined })); say('บันทึกแล้ว', true); } catch (err) { say(err.message, false); }
+      try { await persistPlan({ note: note.value, peakSinceBuy: view.peak ?? undefined }); say('บันทึกแล้ว', true); } catch (err) { say(err.message, false); }
     } }, 'บันทึกความเห็น'));
 
+  if (stale()) return;
   root.replaceChildren(header, metricsCard, planCard, txnCard, halalCard, noteCard, msg);
 }
 
