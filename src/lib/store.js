@@ -1,0 +1,61 @@
+import { GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc, getDocs, addDoc, deleteDoc, collection } from 'firebase/firestore';
+import { auth, db } from './firebase.js';
+import { DEFAULTS } from '../data/defaults.js';
+import { position, deleteTxnError, sortTxns, nextSeq } from './portfolio.js';
+import { validateTxn } from './txn.js';
+
+export const signIn = () => signInWithPopup(auth, new GoogleAuthProvider());
+export const signOut = () => fbSignOut(auth);
+export const currentUser = () => auth.currentUser;
+export const onUser = (cb) => onAuthStateChanged(auth, cb);
+
+const userRef = (uid) => doc(db, 'users', uid);
+
+export async function ensureUserDoc(uid) {
+  const snap = await getDoc(userRef(uid));
+  if (!snap.exists()) await setDoc(userRef(uid), JSON.parse(JSON.stringify(DEFAULTS)));
+}
+
+export async function getUser(uid) {
+  const snap = await getDoc(userRef(uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+export const saveSettings = (uid, patch) => {
+  const p = { ...patch };
+  if (typeof p.finnhubKey === 'string') p.finnhubKey = p.finnhubKey.trim();
+  return setDoc(userRef(uid), { settings: p }, { merge: true });
+};
+export const saveGoals = (uid, patch) => setDoc(userRef(uid), { goals: patch }, { merge: true });
+export const setWatchlist = (uid, list) => setDoc(userRef(uid), { watchlist: list }, { merge: true });
+
+export async function listTxns(uid) {
+  const snap = await getDocs(collection(db, 'users', uid, 'txns'));
+  return sortTxns(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); // Firestore คืนตาม auto-ID (สุ่ม) จึงเรียงเองตามวันที่ + seq
+}
+
+export async function addTxn(uid, txn) {
+  validateTxn(txn); // ตรวจก่อนโหลดข้อมูล
+  const existing = await listTxns(uid);
+  // seq = ลำดับที่บันทึก (ตัวเลขเสมอ) ใช้เรียงรายการวันเดียวกัน เช่น ขายหมดแล้วซื้อใหม่ในวันเดียว
+  const t = validateTxn({ ...txn, seq: nextSeq(existing, Date.now()) });
+  position([...existing, t], t.symbol); // throws on oversell
+  return addDoc(collection(db, 'users', uid, 'txns'), t);
+}
+/** ลบรายการ แต่ปฏิเสธถ้าลบแล้วประวัติของหุ้นตัวนั้นจะขายเกินจำนวนที่ถือ */
+export async function deleteTxn(uid, id) {
+  const err = deleteTxnError(await listTxns(uid), id);
+  if (err) throw new Error(err);
+  return deleteDoc(doc(db, 'users', uid, 'txns', id));
+}
+
+const sub = (uid, col, id) => doc(db, 'users', uid, col, id);
+async function getSub(uid, col, id) {
+  const s = await getDoc(sub(uid, col, id));
+  return s.exists() ? s.data() : null;
+}
+export const getHalal = (uid, sym) => getSub(uid, 'halal', sym);
+export const saveHalal = (uid, sym, data) => setDoc(sub(uid, 'halal', sym), data);
+export const getPlan = (uid, sym) => getSub(uid, 'plans', sym);
+export const savePlan = (uid, sym, plan) => setDoc(sub(uid, 'plans', sym), plan);
