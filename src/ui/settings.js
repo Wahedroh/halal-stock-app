@@ -1,5 +1,6 @@
-import { h } from './components.js';
+import { h, field } from './components.js';
 import { saveSettings, signOut } from '../lib/store.js';
+import { errorText } from '../lib/errors.js';
 
 const pctToFraction = (s) => Number(String(s).trim()) / 100;
 const validPct = (f) => Number.isFinite(f) && f > 0 && f < 1;
@@ -8,7 +9,6 @@ const round = (x) => Math.round(x * 1e6) / 1e6;
 export function renderSettings(root, ctx) {
   const s = ctx.user.settings;
   const msg = h('p', { class: 'msg' });
-  const field = (label, input) => h('label', { class: 'field' }, h('span', {}, label), input);
   const inp = (value, extra = {}) => h('input', { value: value ?? '', inputmode: 'decimal', ...extra });
 
   const key = inp(s.finnhubKey, { type: 'password', inputmode: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'Finnhub API key' });
@@ -34,7 +34,7 @@ export function renderSettings(root, ctx) {
       Object.assign(ctx.user.settings, patch);
       ctx.refreshClient();
       msg.className = 'msg ok'; msg.textContent = 'บันทึกแล้ว';
-    } catch (err) { fail(err.message || 'บันทึกไม่สำเร็จ'); }
+    } catch (err) { fail(errorText(err)); }
   }
   function fail(text) { msg.className = 'msg err'; msg.textContent = text; }
 
@@ -49,5 +49,5 @@ export function renderSettings(root, ctx) {
       field('เตือนเมื่อราคาห่างไม่เกิน (%)', near),
       field('ภาษีหัก ณ ที่จ่ายปันผล (%)', wht),
       h('button', { type: 'submit' }, 'บันทึก'), msg),
-    h('button', { type: 'button', class: 'secondary', onclick: () => signOut() }, 'ออกจากระบบ'));
+    h('button', { type: 'button', class: 'secondary', onclick: () => signOut().catch((e) => fail(errorText(e))) }, 'ออกจากระบบ'));
 }

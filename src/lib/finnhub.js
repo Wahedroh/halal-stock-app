@@ -5,9 +5,14 @@ const DAY_TTL = 24 * 60 * 60 * 1000;
 const MESSAGES = {
   not_found: 'ไม่พบหุ้นนี้',
   bad_key: 'API key ไม่ถูกต้อง ไปที่ตั้งค่า',
+  no_key: 'ยังไม่ได้ใส่ API key ไปที่ตั้งค่า',
+  forbidden: 'API key ไม่ถูกต้อง หรือแพ็กฟรีไม่รองรับหุ้นตัวนี้',
   rate_limit: 'เรียกข้อมูลถี่เกินไป รอ 1 นาที',
   network: 'เชื่อมต่อไม่ได้',
 };
+
+// error ที่ไม่ควรใช้แคชเก่าแทน (ต้องแก้ที่ต้นเหตุ)
+const NO_STALE = new Set(['not_found', 'bad_key', 'forbidden']);
 
 export class FinnhubError extends Error {
   constructor(code) {
@@ -37,7 +42,7 @@ export function createFinnhub({ key, fetchFn = (...a) => fetch(...a), storage = 
   async function request(kind, sym, ttl, path, map) {
     const symbol = String(sym ?? '').trim().toUpperCase();
     if (!symbol) throw new FinnhubError('not_found');
-    if (!key || !String(key).trim()) throw new FinnhubError('bad_key');
+    if (!key || !String(key).trim()) throw new FinnhubError('no_key');
     const ck = `fh:${kind}:${symbol}`;
     const cached = readCache(ck);
     if (cached && now() - cached.t < ttl) return cached.data;
@@ -48,7 +53,8 @@ export function createFinnhub({ key, fetchFn = (...a) => fetch(...a), storage = 
       } catch {
         throw new FinnhubError('network');
       }
-      if (res.status === 401 || res.status === 403) throw new FinnhubError('bad_key');
+      if (res.status === 401) throw new FinnhubError('bad_key');
+      if (res.status === 403) throw new FinnhubError('forbidden');
       if (res.status === 429) throw new FinnhubError('rate_limit');
       if (!res.ok) throw new FinnhubError('network');
       let body;
@@ -57,7 +63,7 @@ export function createFinnhub({ key, fetchFn = (...a) => fetch(...a), storage = 
       writeCache(ck, data);
       return data;
     } catch (err) {
-      if (err instanceof FinnhubError && err.code !== 'not_found' && err.code !== 'bad_key' && cached) {
+      if (err instanceof FinnhubError && !NO_STALE.has(err.code) && cached) {
         return { ...cached.data, stale: true };
       }
       throw err;

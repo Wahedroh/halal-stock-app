@@ -19,10 +19,10 @@ test('unknown symbol -> not_found', async () => {
   await expect(fh.quote('ZZZZ')).rejects.toMatchObject({ code: 'not_found' });
 });
 
-test('401 -> bad_key, 403 -> bad_key, 429 -> rate_limit, 500 -> network', async () => {
+test('401 -> bad_key, 403 -> forbidden, 429 -> rate_limit, 500 -> network', async () => {
   const mk = (s) => createFinnhub({ key: 'k', fetchFn: async () => statusResp(s), storage: memStore() });
   await expect(mk(401).quote('AAPL')).rejects.toMatchObject({ code: 'bad_key' });
-  await expect(mk(403).quote('AAPL')).rejects.toMatchObject({ code: 'bad_key' });
+  await expect(mk(403).quote('AAPL')).rejects.toMatchObject({ code: 'forbidden', message: 'API key ไม่ถูกต้อง หรือแพ็กฟรีไม่รองรับหุ้นตัวนี้' });
   await expect(mk(429).quote('AAPL')).rejects.toMatchObject({ code: 'rate_limit' });
   await expect(mk(500).quote('AAPL')).rejects.toMatchObject({ code: 'network' });
 });
@@ -141,17 +141,17 @@ test('empty symbol -> not_found without fetching', async () => {
   expect(f.calls.length).toBe(0);
 });
 
-test('missing key -> bad_key without fetching', async () => {
+test('missing key -> no_key without fetching', async () => {
   const f = counting(() => okResp(QUOTE));
   for (const key of [undefined, '', '  ']) {
     const fh = createFinnhub({ key, fetchFn: f, storage: memStore() });
-    await expect(fh.quote('AAPL')).rejects.toMatchObject({ code: 'bad_key' });
+    await expect(fh.quote('AAPL')).rejects.toMatchObject({ code: 'no_key', message: 'ยังไม่ได้ใส่ API key ไปที่ตั้งค่า' });
   }
   expect(f.calls.length).toBe(0);
 });
 
 test('Thai messages and key never in message', async () => {
-  const msgs = { not_found: 'ไม่พบหุ้นนี้', bad_key: 'API key ไม่ถูกต้อง ไปที่ตั้งค่า', rate_limit: 'เรียกข้อมูลถี่เกินไป รอ 1 นาที', network: 'เชื่อมต่อไม่ได้' };
+  const msgs = { not_found: 'ไม่พบหุ้นนี้', bad_key: 'API key ไม่ถูกต้อง ไปที่ตั้งค่า', no_key: 'ยังไม่ได้ใส่ API key ไปที่ตั้งค่า', forbidden: 'API key ไม่ถูกต้อง หรือแพ็กฟรีไม่รองรับหุ้นตัวนี้', rate_limit: 'เรียกข้อมูลถี่เกินไป รอ 1 นาที', network: 'เชื่อมต่อไม่ได้' };
   for (const [code, message] of Object.entries(msgs)) {
     const e = new FinnhubError(code);
     expect(e).toBeInstanceOf(Error);
@@ -168,4 +168,12 @@ test('corrupt cache entry is ignored', async () => {
   st.setItem('fh:quote:AAPL', '{not json');
   const fh = createFinnhub({ key: 'k', fetchFn: async () => okResp(QUOTE), storage: st });
   expect((await fh.quote('AAPL')).price).toBe(150.5);
+});
+
+test('403 does not fall back to stale cache', async () => {
+  let t = 0; let resp = okResp(QUOTE);
+  const fh = createFinnhub({ key: 'k', fetchFn: async () => resp, storage: memStore(), now: () => t });
+  await fh.quote('AAPL');
+  t = 120_000; resp = statusResp(403);
+  await expect(fh.quote('AAPL')).rejects.toMatchObject({ code: 'forbidden' });
 });

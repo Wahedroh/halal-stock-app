@@ -1,3 +1,5 @@
+import { normalizeSymbol, SYMBOL_ERR } from '../lib/symbol.js';
+
 // hash router: #/portfolio, #/stock/:sym, #/goals, #/guide, #/settings
 export function parseRoute(hash) {
   const parts = String(hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -5,7 +7,9 @@ export function parseRoute(hash) {
   if (name === 'stock') {
     let sym = '';
     try { sym = decodeURIComponent(parts[1] || ''); } catch { sym = parts[1] || ''; }
-    return { name: 'stock', sym: sym.trim().toUpperCase() };
+    if (!sym.trim()) return { name: 'stock', sym: '' };
+    const ok = normalizeSymbol(sym);
+    return ok ? { name: 'stock', sym: ok } : { name: 'stock', sym: '', error: SYMBOL_ERR };
   }
   if (['portfolio', 'goals', 'guide', 'settings'].includes(name)) return { name };
   return { name: 'portfolio' };
