@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: { navigateFallbackDenylist: [/^\/__\//] },
       manifest: {
         name: 'พอร์ตหุ้นฮาลาล',
         short_name: 'พอร์ตหุ้น',

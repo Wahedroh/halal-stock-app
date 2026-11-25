@@ -15,7 +15,7 @@ const app = document.querySelector('#app');
 let stopRouter = null;
 
 function signInScreen(error) {
-  app.replaceChildren(h('main', { class: 'center' }, h('h1', {}, 'Stock App'),
+  app.replaceChildren(h('main', { class: 'center' }, h('h1', {}, 'พอร์ตหุ้นฮาลาล'),
     h('button', { type: 'button', onclick: () => signIn().catch((e) => signInScreen(e.message)) }, 'เข้าสู่ระบบด้วย Google'),
     error ? h('p', { class: 'msg err' }, error) : null));
 }
