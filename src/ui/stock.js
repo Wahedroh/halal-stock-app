@@ -27,7 +27,7 @@ export async function renderStock(root, ctx, rawSym) {
     symbol: sym, quote: q.v, metrics: m.v, profile: p.v, txns: txns.v ?? [], plan: plan.v, halal: halal.v, settings: ctx.user.settings,
   });
   const errors = [q, m, p].filter((r) => !r.ok).map((r) => errorMessage(r.e));
-  const rerender = () => renderStock(root, ctx, sym);
+  const rerender = () => (stale() ? undefined : renderStock(root, ctx, sym)); // ข้ามถ้าผู้ใช้ย้ายหน้าแล้ว
   const loadErrors = [[txns, 'ประวัติซื้อขาย'], [plan, 'แผน'], [halal, 'ข้อมูลฮาลาล']].filter(([r]) => !r.ok).map(([, n]) => `โหลด${n}ไม่สำเร็จ`);
   const planOk = plan.ok;
   let curPlan = plan.v ?? null; // สถานะแผนล่าสุดในเครื่อง
@@ -174,6 +174,8 @@ function searchBox(ctx, current) {
     h('div', { class: 'chips' }, ctx.user.watchlist.map((s) => h('a', { href: `#/stock/${s}`, class: s === current ? 'chip on' : 'chip' }, s))),
     current ? h('button', { type: 'button', class: 'link', onclick: async () => {
       const list = inList ? ctx.user.watchlist.filter((x) => x !== current) : [...ctx.user.watchlist, current];
-      await setWatchlist(ctx.uid, list); ctx.user.watchlist = list; location.reload();
+      const hash = location.hash;
+      await setWatchlist(ctx.uid, list); ctx.user.watchlist = list;
+      if (location.hash === hash) location.reload(); // ยังอยู่หน้าเดิมเท่านั้น
     } }, inList ? 'เอาออกจากรายชื่อเฝ้าดู' : 'เพิ่มในรายชื่อเฝ้าดู') : null);
 }
